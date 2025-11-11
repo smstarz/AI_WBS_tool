@@ -1,0 +1,4266 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WBS Management Tool</title>
+    <link href="https://cdn.tailwindcss.com" rel="stylesheet">
+    <link rel="stylesheet" href="js/jsgantt.css">
+    <link rel="stylesheet" href="css/chatbot.css">
+    <style>
+    body {
+      margin: 0;
+      font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background-color: #f5f6fa;
+      color: #222;
+    }
+    header {
+      padding: 1rem 2rem;
+      background: #ffffff;
+      border-bottom: 1px solid #dfe4ea;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 1.5rem;
+      flex-wrap: wrap;
+    }
+    .header-info {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      min-width: 220px;
+    }
+    .header-project {
+      display: flex;
+      align-items: baseline;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
+    h1 {
+      margin: 0;
+      font-size: 15px;
+      font-weight: 600;
+    }
+    .header-status {
+      font-size: 12px;
+      color: #9ca3af;
+      font-weight: 600;
+    }
+    .header-status.is-warning {
+      color: #d97706;
+    }
+    .header-status.is-pending {
+      color: #4d7cff;
+    }
+    .header-status.is-error {
+      color: #dc2626;
+    }
+    .header-date {
+      font-size: 12px;
+      color: #6b7280;
+    }
+    .header-actions {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 0.6rem;
+    }
+    .header-actions button {
+      background: #4d7cff;
+      color: #ffffff;
+      border: none;
+      border-radius: 7px;
+      padding: 0.4rem 1rem;
+      font-size: 12px;
+      font-weight: 600;
+      font-family: inherit;
+      min-width: 110px;
+      min-height: 32px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    .header-actions button:hover {
+      background: #3b66d6;
+    }
+    .header-actions button:disabled {
+      background: #c5cbe8;
+      cursor: not-allowed;
+    }
+    .task-add-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 2px 6px;
+      font-size: 10px;
+      line-height: 1.2;
+      border-radius: 6px;
+      border: 1px solid #94a3f3;
+      background: #f5f7ff;
+      color: #4d7cff;
+      font-weight: 600;
+      white-space: nowrap;
+      cursor: pointer;
+    }
+    .task-add-btn:hover {
+      background: #e1e7ff;
+    }
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      border: 0;
+    }
+    body.is-modal-open {
+      overflow: hidden;
+    }
+    .task-modal {
+      position: fixed;
+      inset: 0;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      padding: 1.5rem;
+      background: rgba(15, 23, 42, 0.45);
+      z-index: 40;
+    }
+    .task-modal.is-open {
+      display: flex;
+    }
+    .task-modal__panel {
+      width: min(640px, 100%);
+      max-height: 90vh;
+      overflow-y: auto;
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 20px 45px rgba(15, 23, 42, 0.25);
+      padding: 1.25rem 1.5rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .task-modal__header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+    }
+    .task-modal__title {
+      margin: 0;
+      font-size: 1rem;
+      font-weight: 600;
+      color: #111827;
+    }
+    .task-modal__close {
+      border: none;
+      background: transparent;
+      font-size: 1.2rem;
+      line-height: 1;
+      cursor: pointer;
+      color: #6b7280;
+    }
+    .task-modal__form {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+      font-size: 0.85rem;
+    }
+    .task-modal__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 0.75rem;
+    }
+    .task-modal__field {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+    }
+    .task-modal__field label {
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #4b5563;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .task-modal__field input,
+    .task-modal__field select,
+    .task-modal__field textarea {
+      width: 100%;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 0.45rem 0.55rem;
+      font-size: 0.85rem;
+      font-family: inherit;
+      box-sizing: border-box;
+    }
+    .task-modal__field textarea {
+      min-height: 60px;
+      resize: vertical;
+    }
+    .task-modal__actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 0.5rem;
+    }
+    .task-modal__actions button {
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      font-size: 0.85rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .task-modal__actions button[type="button"] {
+      border-color: #d1d5db;
+      background: #ffffff;
+      color: #374151;
+    }
+    .task-modal__actions button[type="submit"] {
+      background: #4d7cff;
+      color: #ffffff;
+      border-color: #4d7cff;
+    }
+    .task-modal__actions button[type="submit"]:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .task-modal__error {
+      margin: 0;
+      color: #dc2626;
+      font-size: 0.78rem;
+      min-height: 1.1rem;
+    }
+    main {
+      padding: 0.75rem 2rem 1.5rem;
+    }
+    .content-layout {
+      display: flex;
+      gap: 1.5rem;
+      align-items: flex-start;
+    }
+    .content-primary {
+      flex: 8;
+      min-width: 0;
+    }
+    .content-secondary {
+      flex: 2;
+      min-width: 0;
+      position: sticky;
+      top: 1.5rem;
+      align-self: flex-start;
+    }
+    .detail-panel {
+      max-height: calc(100vh - 4rem);
+      overflow-y: auto;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      font-size: 10px;
+      line-height: 1.4;
+    }
+    .detail-panel__header {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.5rem;
+    }
+    .detail-panel__actions {
+      display: flex;
+      gap: 0.25rem;
+    }
+    .detail-panel__delete-btn {
+      border: 1px solid #fca5a5;
+      background: #fee2e2;
+      color: #991b1b;
+      border-radius: 6px;
+      padding: 0.2rem 0.6rem;
+      font-size: 9px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+    }
+    .detail-panel__delete-btn:hover {
+      background: #fecaca;
+      border-color: #f87171;
+      color: #7f1d1d;
+    }
+    .detail-panel__delete-btn:focus-visible {
+      outline: 2px solid #f87171;
+      outline-offset: 2px;
+    }
+    .detail-panel__delete-btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+    }
+    .detail-panel__placeholder {
+      margin: 0;
+      color: #6b768e;
+      font-size: 0.9em;
+      line-height: 1.4;
+    }
+    .detail-panel__title {
+      margin: 0;
+      font-size: 1em;
+      font-weight: 600;
+      color: #1d2d50;
+    }
+    .detail-panel__subtitle {
+      margin: 0.4rem 0 1.2rem;
+      font-size: 0.8em;
+      color: #6b768e;
+    }
+    .detail-panel__grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 0.375rem;
+    }
+    .detail-panel__grid--basic {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .detail-panel__grid--owner-cost {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .detail-panel__grid--triple {
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .detail-panel__grid--single {
+      grid-template-columns: minmax(0, 1fr);
+    }
+    .detail-panel__section .detail-panel__grid + .detail-panel__grid {
+      margin-top: 0.375rem;
+    }
+    .detail-panel__item {
+      display: flex;
+      flex-direction: column;
+      gap: 0.3rem;
+      background: #ffffff;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 0.375rem 0.425rem;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      min-width: 0;
+    }
+    .detail-panel__label {
+      font-size: 0.68em;
+      font-weight: 600;
+      color: #6b768e;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+    .detail-panel__value {
+      font-size: 1em;
+      color: #1d2333;
+      line-height: 1.35;
+      word-break: break-word;
+      white-space: pre-wrap;
+    }
+    .detail-panel__value input,
+    .detail-panel__value select,
+    .detail-panel__value textarea {
+      width: 100%;
+      box-sizing: border-box;
+      font-family: inherit;
+      font-size: 1em;
+      line-height: 1.35;
+      color: #1d2333;
+      background: #ffffff;
+      border: 1px solid #d1d5db;
+      border-radius: 4px;
+      padding: 0.25rem 0.3rem;
+    }
+    .detail-panel__value textarea {
+      resize: vertical;
+      min-height: 2.4rem;
+    }
+    .detail-panel__value input:focus,
+    .detail-panel__value select:focus,
+    .detail-panel__value textarea:focus {
+      outline: none;
+      border-color: #4d7cff;
+      box-shadow: 0 0 0 1px rgba(77, 124, 255, 0.25);
+    }
+    .detail-panel__value input:disabled,
+    .detail-panel__value select:disabled,
+    .detail-panel__value textarea:disabled {
+      background: #f3f4f6;
+      color: #6b7280;
+      cursor: not-allowed;
+    }
+    .detail-panel__item--fullwidth {
+      grid-column: 1 / -1;
+    }
+    .detail-panel__section {
+      margin-bottom: 0.75rem;
+    }
+    .detail-panel__section-title {
+      font-size: 1em;
+      font-weight: 600;
+      color: #1d2d50;
+      margin-bottom: 0.75rem;
+    }
+    .detail-panel__separator {
+      border: none;
+      border-top: 1px solid #e5e7eb;
+      margin: 1rem 0;
+    }
+    .badge {
+      display: inline-block;
+      background: #e0e7ff;
+      color: #3730a3;
+      padding: 0.25rem 0.5rem;
+      border-radius: 0.25rem;
+      font-size: 0.75rem;
+      font-weight: 500;
+    }
+    .detail-panel .badge {
+      font-size: 0.75em;
+    }
+    .progress-bar {
+      width: 100%;
+      height: 8px;
+      background: #e5e7eb;
+      border-radius: 4px;
+      overflow: hidden;
+      margin-top: 0.25rem;
+    }
+    .progress-fill {
+      height: 100%;
+      background: #3b82f6;
+      transition: width 0.3s ease;
+    }
+    #ganttTarget .gtaskbarcontainer {
+      top: 50%;
+      transform: translateY(-50%);
+      height: 16px;
+    }
+    #ganttTarget .gtaskbarcontainer > div {
+      height: 100%;
+      margin-top: 0;
+      border-radius: 0;
+      box-shadow: none;
+    }
+    #ganttTarget .gtaskbarcontainer.gplan {
+      height: 13px;
+      opacity: 0.35;
+    }
+    #ganttTarget .gtask-level-1 { background: #a0cafd; }
+    #ganttTarget .gtask-level-2 { background: #aae1ff; }
+    #ganttTarget .gtask-level-3 { background: #a9ffc7; }
+    #ganttTarget .gtask-level-4 { background: #fde274; }
+    #ganttTarget .gtask-level-1.gplan { background: rgba(191, 219, 254, 0.6); }
+    #ganttTarget .gtask-level-2.gplan { background: rgba(186, 230, 253, 0.6); }
+    #ganttTarget .gtask-level-3.gplan { background: rgba(187, 247, 208, 0.6); }
+    #ganttTarget .gtask-level-4.gplan { background: rgba(253, 230, 138, 0.6); }
+    #ganttTarget .gtask-level-1complete,
+    #ganttTarget .gtask-level-2complete,
+    #ganttTarget .gtask-level-3complete,
+    #ganttTarget .gtask-level-4complete {
+      height: 100%;
+      margin-top: 0;
+      border-radius: 0;
+      background: rgba(255, 255, 255, 0.25);
+      opacity: 1;
+    }
+    #ganttTarget [class$='endpointleft'],
+    #ganttTarget [class$='endpointright'] {
+      display: none;
+    }
+    #ganttTarget .gadditional-progress {
+      min-width: 72px;
+      text-align: right;
+      color: #1d2333;
+      font-weight: 600;
+    }
+    #ganttTarget .gadditional-progress div {
+      padding-right: 8px;
+    }
+    #ganttTarget .gcharttableh .gminorheadingwkend,
+    #ganttTarget .gcharttableh .gminorheadingwkend div {
+      background: #f5f5f5;
+      color: #94a3b8;
+    }
+    #ganttTarget .gtaskcellwkend {
+      background: #f8fafc;
+    }
+    #ganttTarget .gCurDate {
+      border-color: #3b82f6;
+    }
+    #ganttTarget .gtasklist {
+      padding: 0;
+    }
+    #ganttTarget .gtasklist.hierarchy-cell {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.25rem;
+    }
+    #ganttTarget .gtasktable td.hierarchy-cell,
+    #ganttTarget .gtasktableh td.hierarchy-cell {
+      border: 0;
+    }
+    #ganttTarget .gtasktable td.gtaskid,
+    #ganttTarget .gtasktableh td.gtaskid,
+    #ganttTarget .gtasktable td.gtaskname,
+    #ganttTarget .gtasktableh td.gtaskname {
+      padding-left: 3px;
+    }
+    #ganttTarget .hierarchy-toggle {
+      width: 18px;
+      height: 18px;
+      border: none;
+      border-radius: 4px;
+      background: #d1d5db;
+      color: #1f2937;
+      font-size: 12px;
+      line-height: 1;
+      cursor: pointer;
+      padding: 0;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    #ganttTarget .hierarchy-toggle.is-open {
+      background: #93c5fd;
+      color: #0f172a;
+    }
+    #ganttTarget .hierarchy-toggle:hover {
+      background: #bfdbfe;
+    }
+    #ganttTarget .hierarchy-toggle:focus-visible {
+      outline: 2px solid #2563eb;
+      outline-offset: 1px;
+    }
+    #ganttTarget .hierarchy-placeholder {
+      display: inline-block;
+      width: 12px;
+      height: 12px;
+    }
+    #gantt-shell {
+      background: #ffffff;
+      border: 1px solid #dce1eb;
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 6px 18px rgba(10, 35, 66, 0.05);
+    }
+    #ganttTarget {
+      min-height: 500px;
+      overflow: auto;
+    }
+    .loader {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      font-size: 0.95rem;
+      color: #425466;
+    }
+    .loader::before {
+      content: "";
+      width: 16px;
+      height: 16px;
+      border: 3px solid #4d7cff;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.9s linear infinite;
+      display: inline-block;
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .error {
+      padding: 0.75rem 1rem;
+      border-radius: 6px;
+      background: rgba(217, 64, 64, 0.12);
+      color: #9b1c1c;
+      font-weight: 600;
+    }
+    .status {
+      display: none;
+    }
+    .status.error {
+      display: inline;
+      font-size: 0.85rem;
+      color: #d13a3a;
+      margin: 0;
+    }
+    .gtasktable tr.task-row {
+      cursor: pointer;
+      transition: background 0.2s ease, color 0.2s ease;
+    }
+    .gtasktable tr.task-row:hover {
+      background: #f0f4ff;
+    }
+    .gtasktable tr.task-row.is-selected {
+      background: #e0e8ff;
+    }
+    .gtasktable tr.task-row:focus {
+      outline: 2px solid #4d7cff;
+      outline-offset: -2px;
+    }
+    .has-inline-error {
+      position: relative;
+    }
+    .has-inline-error::after {
+      content: attr(data-inline-error);
+      position: absolute;
+      top: 100%;
+      left: 50%;
+      transform: translate(-50%, 6px);
+      background: #fff1f1;
+      color: #a31616;
+      border: 1px solid #d13a3a;
+      border-radius: 4px;
+      padding: 0.15rem 0.35rem;
+      font-size: 10px;
+      white-space: nowrap;
+      pointer-events: none;
+      z-index: 5;
+    }
+    .gtasktable td.has-inline-error {
+      border-color: #d13a3a;
+    }
+    .detail-panel__value.has-inline-error input,
+    .detail-panel__value.has-inline-error select,
+    .detail-panel__value.has-inline-error textarea {
+      border-color: #d13a3a;
+      background: #fff1f1;
+    }
+    .gtasktable tr.has-validation-error:not(.is-selected) {
+      background: rgba(217, 64, 64, 0.15);
+    }
+    .gtasktable tr.has-validation-error:not(.is-selected):hover {
+      background: rgba(217, 64, 64, 0.25);
+    }
+    .gtasktable tr.has-validation-warning:not(.is-selected) {
+      background: rgba(253, 186, 116, 0.18);
+    }
+    .gtasktable tr.has-validation-warning:not(.is-selected):hover {
+      background: rgba(253, 186, 116, 0.28);
+    }
+    .gtasktable,
+    .gtasktableh {
+      border-collapse: collapse;
+    }
+    .gtasktable td,
+    .gtasktableh td {
+      border: 1px solid #dce1eb;
+      box-sizing: border-box;
+    }
+    .gtasktable td > div,
+    .gtasktableh td > div,
+    .gtasktable td > span,
+    .gtasktableh td > span {
+      width: 100%;
+      min-width: 0;
+      max-width: none;
+      display: inline-block;
+    }
+    .gtasktable .gweight,
+    .gtasktable .gstatus,
+    .gtasktableh .gweight,
+    .gtasktableh .gstatus {
+      font-size: 10px;
+      text-align: center;
+    }
+    .gtasktable tr[data-weight-invalid="true"] .gweight {
+      background: rgba(217, 64, 64, 0.25);
+      color: #a31616;
+      font-weight: 600;
+    }
+    .gtasktable tr.is-selected[data-weight-invalid="true"] .gweight {
+      background: rgba(217, 64, 64, 0.35);
+    }
+    .project-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.55);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem;
+      z-index: 1000;
+    }
+    .project-overlay.hidden {
+      display: none;
+    }
+    .project-panel {
+      width: min(520px, 100%);
+      background: #ffffff;
+      border-radius: 12px;
+      box-shadow: 0 18px 38px rgba(15, 23, 42, 0.25);
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 1.5rem;
+    }
+    .project-panel h2 {
+      margin: 0;
+      font-size: 1.35rem;
+      color: #1d2d50;
+    }
+    .project-panel__desc {
+      margin: 0;
+      color: #4a5a74;
+      line-height: 1.4;
+      font-size: 0.95rem;
+    }
+    .project-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+      max-height: 220px;
+      overflow-y: auto;
+    }
+    .project-option {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0.8rem 1rem;
+      border-radius: 8px;
+      border: 1px solid #dce1eb;
+      background: #f7f9fc;
+      cursor: pointer;
+      transition: background 0.2s ease, border-color 0.2s ease;
+    }
+    .project-option:hover {
+      background: #ecf1ff;
+      border-color: #4d7cff;
+    }
+    .project-option__name {
+      font-weight: 600;
+      color: #1d2d50;
+    }
+    .project-option__meta {
+      font-size: 0.82rem;
+      color: #4a5a74;
+    }
+    .project-create {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+    .project-create label {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.9rem;
+      color: #4a5a74;
+    }
+    .project-create input {
+      padding: 0.65rem 0.75rem;
+      border-radius: 8px;
+      border: 1px solid #ccd4e5;
+      font-size: 0.95rem;
+    }
+    .project-create input:focus {
+      outline: none;
+      border-color: #4d7cff;
+      box-shadow: 0 0 0 2px rgba(77, 124, 255, 0.1);
+    }
+    .project-create button,
+    .project-panel__refresh {
+      align-self: flex-start;
+      background: #4d7cff;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      padding: 0.6rem 1.25rem;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    .project-create button:hover,
+    .project-panel__refresh:hover {
+      background: #3b66d6;
+    }
+    .project-create button:disabled,
+    .project-panel__refresh:disabled {
+      background: #c5cbe8;
+      cursor: not-allowed;
+    }
+    .project-overlay__status {
+      font-size: 0.9rem;
+      color: #d13a3a;
+      min-height: 1.1rem;
+    }
+    @media (max-width: 1024px) {
+      .content-layout {
+        flex-direction: column;
+      }
+      .content-secondary {
+        position: static;
+      }
+      .detail-panel {
+        max-height: none;
+        min-height: 240px;
+      }
+      .detail-panel__grid--owner-cost {
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        justify-content: stretch;
+      }
+      .detail-panel__grid--basic,
+      .detail-panel__grid--triple {
+        grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-info">
+      <div class="header-project">
+        <h1 id="headerTitle">프로젝트 미선택</h1>
+        <span id="autoSaveStatus" class="header-status">프로젝트 선택 필요</span>
+      </div>
+      <span id="headerDate" class="header-date"></span>
+    </div>
+    <div class="header-actions">
+      <button id="generateReport" type="button">Report</button>
+      <button id="uploadTrigger" type="button">CSV 업로드</button>
+      <input id="csvInput" type="file" accept=".csv" hidden>
+      <button id="downloadCsv" type="button">CSV 다운로드</button>
+      <button id="changeProject" type="button">프로젝트 변경</button>
+    </div>
+  </header>
+  <main>
+    <div class="content-layout">
+      <section id="gantt-shell" class="content-primary">
+        <div id="ganttTarget">
+          <div class="loader">WBS 데이터를 불러오는 중…</div>
+        </div>
+      </section>
+      <aside class="content-secondary">
+        <div class="detail-panel">
+          <p class="detail-panel__placeholder">
+            작업을 선택하면 여기에서 상세 정보를 볼 수 있습니다.
+          </p>
+        </div>
+        <section class="chatbot-widget" aria-label="AI WBS 챗봇">
+          <div class="chatbot-widget__header">
+            <span id="chatbotHeaderTitle" class="chatbot-widget__title">AI WBS 챗봇</span>
+            <div class="chatbot-widget__header-actions">
+              <button id="chatbotHeaderBack" type="button" class="chatbot-header-back" disabled>← 목록</button>
+              <span id="chatbotStatus" class="chatbot-widget__status">LLM 연결 준비중</span>
+            </div>
+          </div>
+          <div class="chatbot-widget__content">
+            <div id="chatbotListView" class="chatbot-view is-active" aria-live="polite">
+              <form id="chatbotTopicForm" class="chatbot-topic-form" autocomplete="off">
+                <label for="chatbotTopicInput" class="sr-only">새 대화 주제</label>
+                <input
+                  id="chatbotTopicInput"
+                  class="chatbot-widget__input chatbot-topic-form__input"
+                  type="text"
+                  placeholder="새 대화 주제를 입력하세요"
+                />
+                <button type="submit" class="chatbot-widget__submit">시작</button>
+              </form>
+              <div id="chatbotTopics" class="chatbot-topics"></div>
+              <p id="chatbotListMessage" class="chatbot-widget__helper"></p>
+            </div>
+            <div id="chatbotConversationView" class="chatbot-view" aria-live="polite">
+              <div id="chatbotMessages" class="chatbot-widget__messages"></div>
+              <p id="chatbotConversationMessage" class="chatbot-widget__helper"></p>
+              <form id="chatbotForm" class="chatbot-widget__form" autocomplete="off">
+                <label for="chatbotInput" class="sr-only">메시지 입력</label>
+                <input id="chatbotInput" class="chatbot-widget__input" type="text" placeholder="메시지를 입력하세요…" />
+                <button id="chatbotSubmit" type="submit" class="chatbot-widget__submit" disabled>전송</button>
+              </form>
+            </div>
+          </div>
+        </section>
+      </aside>
+    </div>
+    <p id="statusMessage" class="status"></p>
+  </main>
+  <div id="projectOverlay" class="project-overlay">
+    <div class="project-panel">
+      <div>
+        <h2>프로젝트 선택</h2>
+        <p class="project-panel__desc">
+          관리할 프로젝트를 선택하거나 새 프로젝트를 만들어 독립적인 WBS를 구성하세요.
+        </p>
+      </div>
+      <button id="refreshProjects" type="button" class="project-panel__refresh">목록 새로고침</button>
+      <div id="projectList" class="project-list"></div>
+      <div id="projectOverlayStatus" class="project-overlay__status"></div>
+      <form id="createProjectForm" class="project-create">
+        <label for="projectNameInput">
+          새 프로젝트 이름
+          <input id="projectNameInput" type="text" maxlength="80" autocomplete="off" placeholder="예: 모바일 앱 고도화" required>
+        </label>
+        <button type="submit">프로젝트 생성</button>
+      </form>
+    </div>
+  </div>
+  <div id="addTaskModal" class="task-modal" aria-hidden="true">
+    <div class="task-modal__panel" role="dialog" aria-modal="true" aria-labelledby="addTaskModalTitle">
+      <div class="task-modal__header">
+        <h2 id="addTaskModalTitle" class="task-modal__title">새 작업 추가</h2>
+        <button type="button" class="task-modal__close" aria-label="닫기">×</button>
+      </div>
+      <form id="addTaskForm" class="task-modal__form">
+        <div class="task-modal__grid">
+          <div class="task-modal__field">
+            <label for="addTaskLevel">Level *</label>
+            <select id="addTaskLevel" name="level" required>
+              <option value="1" selected>1</option>
+              <option value="2">2</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+            </select>
+          </div>
+          <div class="task-modal__field">
+            <label for="addTaskParent">Parent *</label>
+            <select id="addTaskParent" name="parentWbsId" required>
+              <option value="">상위 작업 없음</option>
+            </select>
+          </div>
+          <div class="task-modal__field">
+            <label for="addTaskWbsId">Task ID *</label>
+            <input id="addTaskWbsId" name="wbsId" type="text" maxlength="80" required placeholder="예: D05-01">
+          </div>
+          <div class="task-modal__field">
+            <label for="addTaskName">Task Name *</label>
+            <input id="addTaskName" name="taskName" type="text" maxlength="120" required>
+          </div>
+          <div class="task-modal__field">
+            <label for="addTaskStart">Start Date *</label>
+            <input id="addTaskStart" name="startDate" type="date" required>
+          </div>
+          <div class="task-modal__field">
+            <label for="addTaskEnd">End Date *</label>
+            <input id="addTaskEnd" name="endDate" type="date" required>
+          </div>
+        </div>
+        <div class="task-modal__grid">
+          <div class="task-modal__field">
+            <label for="addTaskOwner">Owner</label>
+            <input id="addTaskOwner" name="owner" type="text" maxlength="80" placeholder="예: 김PM">
+          </div>
+          <div class="task-modal__field">
+            <label for="addTaskPriority">Priority</label>
+            <select id="addTaskPriority" name="priority">
+              <option value="Very High">Very High</option>
+              <option value="High">High</option>
+              <option value="Medium" selected>Medium</option>
+              <option value="Low">Low</option>
+              <option value="Very Low">Very Low</option>
+            </select>
+          </div>
+          <div class="task-modal__field">
+            <label for="addTaskCost">Cost Estimate</label>
+            <input
+              id="addTaskCost"
+              name="costEstimate"
+              type="text"
+              inputmode="decimal"
+              pattern="[0-9,]*"
+              placeholder="0"
+            >
+          </div>
+          <div class="task-modal__field">
+            <label for="addTaskWeight">Weight</label>
+            <input id="addTaskWeight" name="weight" type="number" step="0.01" value="0">
+          </div>
+          <div class="task-modal__field">
+            <label for="addTaskDeliverable">Deliverable</label>
+            <textarea id="addTaskDeliverable" name="deliverable"></textarea>
+          </div>
+          <div class="task-modal__field">
+            <label for="addTaskAcceptance">Acceptance Criteria</label>
+            <textarea id="addTaskAcceptance" name="acceptanceCriteria"></textarea>
+          </div>
+          <div class="task-modal__field">
+            <label for="addTaskReview">Review Date</label>
+            <input id="addTaskReview" name="reviewDate" type="text" placeholder="YYYY-MM-DD">
+          </div>
+        </div>
+        <p id="addTaskModalError" class="task-modal__error" role="alert"></p>
+        <div class="task-modal__actions">
+          <button id="addTaskCancel" type="button">취소</button>
+          <button type="submit">작업 추가</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script src="js/jsgantt.bundle.js"></script>
+  <script src="js/papaparse.min.js"></script>
+  <script type="module">
+    import {
+      FIELD_DEFS,
+      STATUS_OPTIONS,
+      PRIORITY_OPTIONS,
+      normalizeStatusValue,
+      normalizePriorityValue,
+      normalizeDate,
+      normalizeOptionalDate,
+      STATUS_DEFAULT,
+      createTaskRecordFromNormalized,
+      createTaskRecordFromStorage,
+      createTaskRecordFromLegacyJson,
+      parseCsvText,
+      evaluateRecord,
+      evaluateRecords
+    } from './js/validation/index.js';
+    import { initChatbot } from './js/chatbot.js';
+    import { generateReportHtml, buildReportFilename } from './js/reportGenerator.js';
+
+    (function initGantt() {
+      const TASK_TABLE_COLUMNS = [
+        { cls: 'gtasklist', label: '\u00A0', width: 28 },
+        { cls: 'gtaskid', label: 'Task ID', width: 70, field: 'wbsId' },
+        { cls: 'gtaskname', label: 'Task Name', width: 220, field: 'taskName', fallbackField: 'wbsId' },
+        { cls: 'gstartdate', label: 'Start Date', width: 70, field: 'startDate', isDate: true },
+        { cls: 'genddate', label: 'End Date', width: 70, field: 'endDate', isDate: true },
+        { cls: 'gplanned', label: 'Planned', width: 50, field: 'planned', formatter: value => {
+          if (Number.isFinite(value)) {
+            return value + '%';
+          }
+          if (typeof value === 'string' && value.trim() !== '') {
+            const numeric = Number.parseFloat(value);
+            if (!Number.isNaN(numeric)) {
+              return Math.round(numeric) + '%';
+            }
+          }
+          return '';
+        }},
+        { cls: 'gcomp', label: 'Progress', width: 50, field: 'progress', formatter: value => Number.isFinite(value) ? value + '%' : '' },
+        { cls: 'gowner', label: 'Owner', width: 50, field: 'owner' },
+        { cls: 'gweight', label: 'Weight', width: 50, field: 'weight' },
+        { cls: 'gstatus', label: 'Status', width: 50, field: 'status' }
+      ];
+      const TASK_COLUMN_BY_CLASS = TASK_TABLE_COLUMNS.reduce((acc, column) => {
+        acc[column.cls] = column;
+        return acc;
+      }, Object.create(null));
+      const EDITABLE_COLUMN_CONFIG = {
+        gtaskname: {
+          field: 'taskName',
+          element: 'input',
+          inputType: 'text',
+          toInputValue: (value, ctx) => (value ?? ctx.cellText ?? '').toString(),
+          parse: raw => {
+            const trimmed = raw.trim();
+            if (!trimmed) {
+              throw new Error('작업명을 입력하세요.');
+            }
+            return trimmed;
+          }
+        },
+        gstartdate: {
+          field: 'startDate',
+          element: 'input',
+          inputType: 'date',
+          toInputValue: (value, ctx) => (value && value.toString()) || ctx.cellText || '',
+          parse: (raw, ctx) => normalizeDate(raw, '작업 ' + ctx.wbsId, 'Start Date')
+        },
+        genddate: {
+          field: 'endDate',
+          element: 'input',
+          inputType: 'date',
+          toInputValue: (value, ctx) => (value && value.toString()) || ctx.cellText || '',
+          parse: (raw, ctx) => normalizeDate(raw, '작업 ' + ctx.wbsId, 'End Date')
+        },
+        gcomp: {
+          field: 'progress',
+          element: 'input',
+          inputType: 'number',
+          attributes: { min: '0', max: '100', step: '1' },
+          blockedMessage: '하위 작업이 있는 항목의 Progress는 자동 계산되어 직접 수정할 수 없습니다.',
+          canEdit: ({ record }) => !(record && record.hasChildren),
+          toInputValue: (value, ctx) => {
+            if (Number.isFinite(value)) {
+              return value.toString();
+            }
+            const match = (ctx.cellText || '').match(/-?\d+(\.\d+)?/);
+            return match ? match[0] : '';
+          },
+          parse: raw => {
+            const trimmed = raw.trim();
+            if (!trimmed) {
+              throw new Error('Progress 값을 입력하세요.');
+            }
+            const numeric = Number(trimmed);
+            if (!Number.isFinite(numeric)) {
+              throw new Error('Progress 값은 숫자여야 합니다.');
+            }
+            if (numeric < 0 || numeric > 100) {
+              throw new Error('Progress 값은 0에서 100 사이여야 합니다.');
+            }
+            return Math.round(numeric);
+          }
+        },
+        gweight: {
+          field: 'weight',
+          element: 'input',
+          inputType: 'number',
+          attributes: { step: 'any' },
+          toInputValue: (value, ctx) => (value ?? ctx.cellText ?? '').toString(),
+          parse: raw => {
+            const trimmed = raw.trim();
+            if (!trimmed) {
+              throw new Error('Weight 값을 입력하세요.');
+            }
+            const numeric = Number(trimmed);
+            if (!Number.isFinite(numeric)) {
+              throw new Error('Weight 값은 숫자여야 합니다.');
+            }
+            return trimmed;
+          }
+        },
+        gstatus: {
+          field: 'status',
+          element: 'select',
+          options: STATUS_OPTIONS,
+          toInputValue: (value, ctx) => {
+            const base = value !== undefined && value !== null ? value : ctx.cellText || '';
+            return normalizeStatusValue(base);
+          },
+          parse: raw => {
+            const normalized = normalizeStatusValue(raw);
+            if (!STATUS_OPTIONS.includes(normalized)) {
+              throw new Error('허용되지 않은 Status 값입니다.');
+            }
+            return normalized;
+          }
+        }
+      };
+      const EDITABLE_CLASS_NAMES = Object.keys(EDITABLE_COLUMN_CONFIG);
+
+      function resolveParentTaskName(record) {
+        if (!record) {
+          return '';
+        }
+        const parentKey = record.parentWbsId;
+        if (!parentKey) {
+          return '';
+        }
+        const parentRecord = currentRowLookup.get(parentKey);
+        if (parentRecord && parentRecord.taskName) {
+          return parentRecord.taskName;
+        }
+        return parentKey;
+      }
+
+      const COST_NUMBER_FORMATTER =
+        typeof Intl !== 'undefined' && typeof Intl.NumberFormat === 'function'
+          ? new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 2 })
+          : null;
+
+      function formatCostEstimateDisplay(value) {
+        if (value === undefined || value === null || value === '') {
+          return '';
+        }
+        let numeric = value;
+        if (typeof numeric !== 'number') {
+          const normalized = value.toString().replace(/,/g, '').trim();
+          numeric = Number(normalized);
+        }
+        if (!Number.isFinite(numeric)) {
+          return value.toString();
+        }
+        if (COST_NUMBER_FORMATTER) {
+          return COST_NUMBER_FORMATTER.format(numeric);
+        }
+        return numeric.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+      }
+
+      function stripNumberSeparators(value) {
+        if (value === undefined || value === null) {
+          return '';
+        }
+        return value.toString().replace(/,/g, '').trim();
+      }
+
+      function attachCostInputFormatting(input) {
+        if (!input || input.dataset.costFormatAttached) {
+          return;
+        }
+        input.addEventListener('focus', () => {
+          const plain = stripNumberSeparators(input.value);
+          input.value = plain;
+        });
+        input.addEventListener('blur', () => {
+          const plain = stripNumberSeparators(input.value);
+          if (!plain) {
+            input.value = '';
+            return;
+          }
+          const numeric = Number(plain);
+          if (Number.isFinite(numeric)) {
+            input.value = formatCostEstimateDisplay(numeric);
+          }
+        });
+        input.dataset.costFormatAttached = 'true';
+      }
+
+      const BASIC_FIELDS = [
+        {
+          key: 'parentWbsId',
+          label: '상위 작업',
+          formatter: (_, record) => resolveParentTaskName(record),
+          fullWidth: true
+        },
+        { key: 'startDate', label: 'Start Date' },
+        { key: 'endDate', label: 'End Date' },
+        { key: 'duration', label: 'Duration' }
+      ];
+      const DETAIL_FIELD_GROUPS = [
+        {
+          className: 'detail-panel__grid--owner-cost',
+          fields: [
+            {
+              key: 'owner',
+              label: 'Owner',
+              editor: {
+                element: 'input',
+                inputType: 'text',
+                attributes: { maxlength: '80' },
+                toInputValue: value => (value === undefined || value === null ? '' : value.toString()),
+                parse: raw => raw.trim()
+              }
+            },
+            {
+              key: 'costEstimate',
+              label: 'Cost Estimate',
+              formatter: value => formatCostEstimateDisplay(value),
+              editor: {
+                element: 'input',
+                inputType: 'text',
+                attributes: {
+                  inputmode: 'decimal',
+                  pattern: '[0-9,]*',
+                  placeholder: '0'
+                },
+                toInputValue: value => {
+                  if (value === undefined || value === null || value === '') {
+                    return '';
+                  }
+                  return formatCostEstimateDisplay(value);
+                },
+                parse: raw => {
+                  const trimmed = raw.trim();
+                  if (!trimmed) {
+                    return null;
+                  }
+                  const numeric = Number(trimmed.replace(/,/g, ''));
+                  if (!Number.isFinite(numeric)) {
+                    throw new Error('Cost Estimate는 숫자여야 합니다.');
+                  }
+                  return numeric;
+                }
+              }
+            },
+            {
+              key: 'priority',
+              label: 'Priority',
+              editor: {
+                element: 'select',
+                options: PRIORITY_OPTIONS,
+                placeholder: '선택 없음',
+                toInputValue: value => normalizePriorityValue(value) || '',
+                parse: raw => {
+                  const normalized = normalizePriorityValue(raw);
+                  if (!normalized) {
+                    return '';
+                  }
+                  if (!PRIORITY_OPTIONS.includes(normalized)) {
+                    throw new Error('Priority 값이 올바르지 않습니다.');
+                  }
+                  return normalized;
+                }
+              }
+            }
+          ]
+        },
+        {
+          className: 'detail-panel__grid--triple',
+          fields: [
+            {
+              key: 'weight',
+              label: 'Weight',
+              formatter: value => {
+                if (value === undefined || value === null || value === '') {
+                  return '—';
+                }
+                return value.toString();
+              }
+            },
+            { key: 'status', label: 'Status', badge: true },
+            {
+              key: 'reviewDate',
+              label: 'Review',
+              editor: {
+                element: 'input',
+                inputType: 'text',
+                attributes: { placeholder: 'YYYY-MM-DD' },
+                toInputValue: value => (value === undefined || value === null ? '' : value.toString()),
+                parse: raw => {
+                  const trimmed = raw.trim();
+                  if (!trimmed) {
+                    return '';
+                  }
+                  return normalizeOptionalDate(trimmed, '상세 정보', 'Review');
+                }
+              }
+            }
+          ]
+        },
+        {
+          className: 'detail-panel__grid--single',
+          fields: [
+            {
+              key: 'deliverable',
+              label: 'Deliverable',
+              fullWidth: true,
+              editor: {
+                element: 'input',
+                inputType: 'text',
+                attributes: { maxlength: '200' },
+                toInputValue: value => (value === undefined || value === null ? '' : value.toString()),
+                parse: raw => raw.trim()
+              }
+            }
+          ]
+        },
+        {
+          className: 'detail-panel__grid--single',
+          fields: [
+            {
+              key: 'acceptanceCriteria',
+              label: 'Acceptance Criteria',
+              fullWidth: true,
+              editor: {
+                element: 'textarea',
+                attributes: { rows: '3', maxlength: '500' },
+                toInputValue: value => (value === undefined || value === null ? '' : value.toString()),
+                parse: raw => raw.trim()
+              }
+            }
+          ]
+        }
+      ];
+      const DETAIL_FIELD_EDITORS = DETAIL_FIELD_GROUPS.reduce((acc, group) => {
+        if (!group || !Array.isArray(group.fields)) {
+          return acc;
+        }
+        group.fields.forEach(field => {
+          if (field && field.editor) {
+            acc[field.key] = field.editor;
+          }
+        });
+        return acc;
+      }, Object.create(null));
+
+      function toUtcMidnight(dateString) {
+        if (typeof dateString !== 'string') {
+          return null;
+        }
+        const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!match) {
+          return null;
+        }
+        const year = Number.parseInt(match[1], 10);
+        const month = Number.parseInt(match[2], 10);
+        const day = Number.parseInt(match[3], 10);
+        if (
+          !Number.isFinite(year) ||
+          !Number.isFinite(month) ||
+          !Number.isFinite(day)
+        ) {
+          return null;
+        }
+        return Date.UTC(year, month - 1, day);
+      }
+
+      function toGanttInclusiveEnd(dateString) {
+        if (typeof dateString !== 'string') {
+          return dateString;
+        }
+        const trimmed = dateString.trim();
+        if (!trimmed) {
+          return trimmed;
+        }
+        if (trimmed.length > 10) {
+          return trimmed;
+        }
+        const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!match) {
+          return trimmed;
+        }
+        return match[1] + '-' + match[2] + '-' + match[3] + 'T23:59:59';
+      }
+
+      function toGanttStartOfDay(dateString) {
+        if (typeof dateString !== 'string') {
+          return dateString;
+        }
+        const trimmed = dateString.trim();
+        if (!trimmed) {
+          return trimmed;
+        }
+        if (trimmed.length > 10) {
+          return trimmed;
+        }
+        const match = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!match) {
+          return trimmed;
+        }
+        return match[1] + '-' + match[2] + '-' + match[3] + 'T00:00:00';
+      }
+
+      function parseLocalDate(dateString) {
+        if (typeof dateString !== 'string') {
+          return null;
+        }
+        const match = dateString.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+        if (!match) {
+          return null;
+        }
+        const year = Number.parseInt(match[1], 10);
+        const month = Number.parseInt(match[2], 10) - 1;
+        const day = Number.parseInt(match[3], 10);
+        if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) {
+          return null;
+        }
+        return new Date(year, month, day);
+      }
+
+      function addDays(date, amount) {
+        if (!(date instanceof Date) || !Number.isFinite(amount)) {
+          return null;
+        }
+        const result = new Date(date.getTime());
+        result.setDate(result.getDate() + amount);
+        return result;
+      }
+
+      function formatMonthLabel(date) {
+        if (!(date instanceof Date)) {
+          return '';
+        }
+        return date.getFullYear() + '년 ' + (date.getMonth() + 1) + '월';
+      }
+
+      function calculatePlannedPercentage(record, referenceDate = new Date()) {
+        if (!record) {
+          return 0;
+        }
+        const startMs = toUtcMidnight(record.startDate);
+        const endBaseMs = toUtcMidnight(record.endDate);
+        const MS_PER_DAY = 24 * 60 * 60 * 1000;
+        const endMs = endBaseMs === null ? null : endBaseMs + MS_PER_DAY;
+        if (startMs === null || endMs === null) {
+          return 0;
+        }
+        const today =
+          referenceDate instanceof Date ? referenceDate : new Date(referenceDate);
+        const todayMs = Date.UTC(
+          today.getFullYear(),
+          today.getMonth(),
+          today.getDate()
+        ) + MS_PER_DAY;
+        if (endMs <= startMs) {
+          return todayMs >= endMs ? 100 : 0;
+        }
+        if (todayMs <= startMs) {
+          return 0;
+        }
+        if (todayMs >= endMs) {
+          return 100;
+        }
+        const elapsed = todayMs - startMs;
+        const total = endMs - startMs;
+        if (total <= 0) {
+          return 0;
+        }
+        const ratio = elapsed / total;
+        const percent = Math.round(ratio * 100);
+        return Math.max(0, Math.min(100, percent));
+      }
+
+      function updateRecordPlanned(record) {
+        if (!record) {
+          return 0;
+        }
+        record.status = normalizeStatusValue(record.status);
+        record.priority = normalizePriorityValue(record.priority);
+        const planned = calculatePlannedPercentage(record);
+        record.planned = planned;
+        record.progressDisplay = Number.isFinite(record.progress) ? record.progress + '%' : '';
+        record.taskCssClass = getTaskClassName(record);
+        return planned;
+      }
+
+      function updateAllPlanned(records) {
+        if (!Array.isArray(records)) {
+          return;
+        }
+        records.forEach(record => updateRecordPlanned(record));
+      }
+
+      function calculateDurationDays(startDate, endDate) {
+        const startMs = toUtcMidnight(startDate);
+        const endMs = toUtcMidnight(endDate);
+        if (startMs === null || endMs === null) {
+          return '';
+        }
+        const MS_PER_DAY = 24 * 60 * 60 * 1000;
+        const diff = Math.max(0, endMs - startMs);
+        return (Math.floor(diff / MS_PER_DAY) + 1).toString();
+      }
+
+      function setAddTaskModalError(message) {
+        if (addTaskModalError) {
+          addTaskModalError.textContent = message || '';
+        }
+      }
+
+      function updateAddTaskParentOptions(levelValue) {
+        if (!addTaskParentField) {
+          return;
+        }
+        const numericLevel = Number.parseInt(levelValue, 10) || 1;
+        addTaskParentField.innerHTML = '';
+        if (numericLevel <= 1) {
+          const option = document.createElement('option');
+          option.value = '';
+          option.textContent = '상위 작업 없음';
+          addTaskParentField.appendChild(option);
+          addTaskParentField.disabled = true;
+          addTaskParentField.value = '';
+          return;
+        }
+        const targetLevel = numericLevel - 1;
+        const candidates = currentRows.filter(row => Number.parseInt(row.level, 10) === targetLevel);
+        const placeholder = document.createElement('option');
+        const hasCandidates = candidates.length > 0;
+        placeholder.value = '';
+        placeholder.textContent = hasCandidates ? '상위 작업을 선택하세요' : '선택 가능한 상위 작업이 없습니다.';
+        placeholder.disabled = !hasCandidates;
+        placeholder.selected = true;
+        addTaskParentField.appendChild(placeholder);
+        addTaskParentField.disabled = !hasCandidates;
+        candidates.forEach(row => {
+          const option = document.createElement('option');
+          option.value = row.wbsId;
+          option.textContent = row.wbsId + ' — ' + (row.taskName || '');
+          addTaskParentField.appendChild(option);
+        });
+      }
+
+      function resetAddTaskForm() {
+        if (!addTaskForm) {
+          return;
+        }
+        addTaskForm.reset();
+        if (addTaskPriorityField) {
+          addTaskPriorityField.value = 'Medium';
+        }
+        updateAddTaskParentOptions(addTaskLevelField ? addTaskLevelField.value : 1);
+        setAddTaskModalError('');
+      }
+
+      function openAddTaskModal() {
+        if (!addTaskModal || !addTaskForm) {
+          return;
+        }
+        if (!currentProject) {
+          setStatus('먼저 프로젝트를 선택하세요.', 'error');
+          return;
+        }
+        resetAddTaskForm();
+        addTaskModal.classList.add('is-open');
+        document.body.classList.add('is-modal-open');
+        if (addTaskWbsField) {
+          addTaskWbsField.focus();
+        }
+      }
+
+      function closeAddTaskModal() {
+        if (!addTaskModal) {
+          return;
+        }
+        addTaskModal.classList.remove('is-open');
+        document.body.classList.remove('is-modal-open');
+        setAddTaskModalError('');
+      }
+
+      async function handleAddTaskSubmit(event) {
+        event.preventDefault();
+        if (!addTaskForm) {
+          return;
+        }
+        if (!currentProject) {
+          setAddTaskModalError('먼저 프로젝트를 선택하세요.');
+          setStatus('먼저 프로젝트를 선택하세요.', 'error');
+          return;
+        }
+        const projectSnapshot = currentProject;
+        const formData = new FormData(addTaskForm);
+        const trim = value => (value === null || value === undefined ? '' : value.toString().trim());
+        const level = Number.parseInt(formData.get('level'), 10) || 1;
+        const parentWbsId = trim(formData.get('parentWbsId'));
+        const wbsId = trim(formData.get('wbsId'));
+        const taskName = trim(formData.get('taskName'));
+        const startDate = trim(formData.get('startDate'));
+        const endDate = trim(formData.get('endDate'));
+        if (level > 1 && !parentWbsId) {
+          setAddTaskModalError('상위 작업을 선택하세요.');
+          return;
+        }
+        if (!wbsId || !taskName || !startDate || !endDate) {
+          setAddTaskModalError('필수 입력값을 모두 채워주세요.');
+          return;
+        }
+        if (currentRowLookup.has(wbsId)) {
+          setAddTaskModalError('이미 존재하는 Task ID입니다.');
+          return;
+        }
+        const owner = trim(formData.get('owner'));
+        const priority = trim(formData.get('priority')) || 'Medium';
+        const costEstimateInput = trim(formData.get('costEstimate'));
+        let costEstimate = 0;
+        if (costEstimateInput) {
+          const numeric = Number(costEstimateInput.replace(/,/g, ''));
+          if (!Number.isFinite(numeric)) {
+            setAddTaskModalError('Cost Estimate는 숫자여야 합니다.');
+            return;
+          }
+          costEstimate = numeric;
+        }
+        const weight = trim(formData.get('weight')) || '0';
+        const deliverable = trim(formData.get('deliverable'));
+        const acceptanceCriteria = trim(formData.get('acceptanceCriteria'));
+        const reviewDate = trim(formData.get('reviewDate'));
+        const normalizedRow = {
+          'wbs id': wbsId,
+          'task name': taskName,
+          level: level.toString(),
+          'parent id': parentWbsId,
+          'start date': startDate,
+          'end date': endDate,
+          duration: '',
+          progress: 0,
+          planned: '',
+          owner,
+          'cost estimate': costEstimate,
+          priority,
+          weight,
+          status: STATUS_DEFAULT,
+          deliverable,
+          'acceptance criteria': acceptanceCriteria,
+          'review date': reviewDate
+        };
+        let record;
+        try {
+          record = createTaskRecordFromNormalized(normalizedRow, '신규 작업');
+        } catch (error) {
+          setAddTaskModalError(error.message || '작업을 추가하지 못했습니다.');
+          return;
+        }
+        if (parentWbsId) {
+          record.parentWbsId = parentWbsId;
+        }
+        record.level = level;
+        record.duration = calculateDurationDays(record.startDate, record.endDate) || record.duration;
+        updateRecordPlanned(record);
+        currentRows = sortRowsByHierarchy(currentRows.concat(record));
+        currentRowLookup = new Map(currentRows.map(row => [row.wbsId, row]));
+        renderChart(currentRows);
+        updateValidationState(currentRows);
+        selectTaskByWbsId(record.wbsId, { suppressFocus: false });
+        closeAddTaskModal();
+        setAddTaskModalError('');
+        hasUnsavedChanges = true;
+        manualUnsavedChanges = true;
+        updateProjectIndicator();
+        updateToolbarState();
+        const taskLabel = record.taskName || record.wbsId;
+        const newTaskWbsId = record.wbsId;
+        setStatus('새 작업 ' + taskLabel + '을(를) 추가했습니다. 서버에 저장 중…');
+        try {
+          await persistProjectRows({ silent: true });
+          if (projectSnapshot) {
+            await loadProjectData(projectSnapshot);
+            selectTaskByWbsId(newTaskWbsId, { suppressFocus: false });
+          }
+          setStatus('새 작업 ' + taskLabel + '을(를) 저장했습니다.');
+        } catch (error) {
+          setStatus(error.message || '새 작업을 저장하지 못했습니다.', 'error');
+        }
+      }
+
+      function getTaskClassName(record) {
+        if (!record || typeof record !== 'object') {
+          return 'gtask-level-1';
+        }
+        const levelNumber = parseInt(record.level, 10);
+        if (Number.isNaN(levelNumber)) {
+          return 'gtask-level-1';
+        }
+        const normalizedLevel = Math.max(1, Math.min(4, levelNumber));
+        return 'gtask-level-' + normalizedLevel;
+      }
+
+      const target = document.getElementById('ganttTarget');
+      const uploadTrigger = document.getElementById('uploadTrigger');
+      const csvInput = document.getElementById('csvInput');
+      const reportBtn = document.getElementById('generateReport');
+      const downloadBtn = document.getElementById('downloadCsv');
+      const autoSaveStatus = document.getElementById('autoSaveStatus');
+      const changeProjectBtn = document.getElementById('changeProject');
+      const statusMessage = document.getElementById('statusMessage');
+      const headerTitle = document.getElementById('headerTitle');
+      const headerDate = document.getElementById('headerDate');
+      const projectOverlay = document.getElementById('projectOverlay');
+      const projectList = document.getElementById('projectList');
+      const projectOverlayStatus = document.getElementById('projectOverlayStatus');
+      const refreshProjectsBtn = document.getElementById('refreshProjects');
+      const createProjectForm = document.getElementById('createProjectForm');
+      const projectNameInput = document.getElementById('projectNameInput');
+      const detailPanel = document.querySelector('.detail-panel');
+      const detailPanelDefault = detailPanel ? detailPanel.innerHTML : '';
+      const addTaskModal = document.getElementById('addTaskModal');
+      const addTaskForm = document.getElementById('addTaskForm');
+      const addTaskModalError = document.getElementById('addTaskModalError');
+      const addTaskCloseBtn = addTaskModal ? addTaskModal.querySelector('.task-modal__close') : null;
+      const addTaskCancelBtn = document.getElementById('addTaskCancel');
+      const addTaskLevelField = document.getElementById('addTaskLevel');
+      const addTaskParentField = document.getElementById('addTaskParent');
+      const addTaskPriorityField = document.getElementById('addTaskPriority');
+      const addTaskCostField = document.getElementById('addTaskCost');
+      const addTaskWbsField = document.getElementById('addTaskWbsId');
+      const chatbotController = initChatbot();
+
+      attachCostInputFormatting(addTaskCostField);
+
+      let ganttChart;
+      let currentRows = [];
+      let currentRowLookup = new Map();
+      let currentValidationState = {
+        issuesByWbsId: new Map(),
+        hasIssues: false
+      };
+      let hasRenderedOnce = false;
+      let currentProject = null;
+      let hasUnsavedChanges = false;
+      let manualUnsavedChanges = false;
+      let pendingServerSyncCount = 0;
+      let projectListCache = [];
+      let isLoadingProject = false;
+      let isSavingProject = false;
+      let isGeneratingReport = false;
+      let selectedTaskWbsId = null;
+      let activeEditor = null;
+      function createConfiguredGanttChart() {
+        const chart = new JSGantt.GanttChart(target, 'day');
+        if (!chart.getDivId()) {
+          throw new Error('간트 차트 컨테이너를 초기화하지 못했습니다.');
+        }
+        chart.setOptions({
+          vCaptionType: 'Complete',
+          vQuarterColWidth: 36,
+          vDateTaskDisplayFormat: 'yyyy-mm-dd',
+          vDateInputFormat: 'yyyy-mm-dd',
+          vShowTaskInfoLink: 1,
+          vShowDeps: 1,
+          vFormatArr: ['Day'],
+          vUseSingleCell: 1,
+          vUseSort: 0,
+          vShowEndWeekDate: 0,
+          vUseToolTip: 0
+        });
+        if (typeof chart.setShowRes === 'function') chart.setShowRes(0);
+        if (typeof chart.setShowCost === 'function') chart.setShowCost(0);
+        if (typeof chart.setShowPlanStartDate === 'function') chart.setShowPlanStartDate(0);
+        if (typeof chart.setShowPlanEndDate === 'function') chart.setShowPlanEndDate(0);
+        if (typeof chart.setAdditionalHeaders === 'function') {
+          chart.setAdditionalHeaders({
+            progressDisplay: { title: 'Progress', class: 'gadditional-progress' }
+          });
+        }
+        if (typeof chart.setColumnOrder === 'function') {
+          chart.setColumnOrder(['vShowDur', 'vShowStartDate', 'vShowEndDate', 'vShowComp', 'progressDisplay']);
+        }
+        if (typeof chart.setDateTaskTableDisplayFormat === 'function') {
+          chart.setDateTaskTableDisplayFormat('yyyy-mm-dd');
+        }
+        if (typeof chart.setDateTaskDisplayFormat === 'function') {
+          chart.setDateTaskDisplayFormat('yyyy-mm-dd');
+        }
+        if (typeof chart.setDayMajorDateDisplayFormat === 'function') {
+          chart.setDayMajorDateDisplayFormat('yyyy/mm');
+        }
+        if (typeof chart.setDayMinorDateDisplayFormat === 'function') {
+          chart.setDayMinorDateDisplayFormat('d');
+        }
+        if (typeof chart.setShowEndWeekDate === 'function') {
+          chart.setShowEndWeekDate(0);
+        }
+        if (typeof chart.setUseToolTip === 'function') {
+          chart.setUseToolTip(0);
+        }
+        return chart;
+      }
+      function ensureGanttChart() {
+        if (ganttChart) {
+          return true;
+        }
+        try {
+          ganttChart = createConfiguredGanttChart();
+          hasRenderedOnce = false;
+          return true;
+        } catch (error) {
+          renderFatalError(error);
+          return false;
+        }
+      }
+
+      function rebuildGanttChartInstance() {
+        if (target) {
+          target.innerHTML = '';
+        }
+        ganttChart = createConfiguredGanttChart();
+        hasRenderedOnce = false;
+      }
+
+      try {
+        ganttChart = createConfiguredGanttChart();
+      } catch (error) {
+        renderFatalError(error);
+        return;
+      }
+
+      uploadTrigger.disabled = true;
+      downloadBtn.disabled = true;
+      changeProjectBtn.disabled = true;
+      if (reportBtn) {
+        reportBtn.disabled = true;
+      }
+      updateProjectIndicator();
+      updateHeaderDate();
+      updateToolbarState();
+      openProjectOverlay(true);
+
+
+
+      uploadTrigger.addEventListener('click', () => {
+        csvInput.click();
+      });
+
+      csvInput.addEventListener('change', handleFileInput);
+      downloadBtn.addEventListener('click', handleDownload);
+      if (reportBtn) {
+        reportBtn.addEventListener('click', handleReportGeneration);
+      }
+      changeProjectBtn.addEventListener('click', () => openProjectOverlay(true));
+      refreshProjectsBtn.addEventListener('click', () => fetchProjects());
+      createProjectForm.addEventListener('submit', handleProjectCreate);
+      if (addTaskForm) {
+        addTaskForm.addEventListener('submit', handleAddTaskSubmit);
+      }
+      if (addTaskCancelBtn) {
+        addTaskCancelBtn.addEventListener('click', () => closeAddTaskModal());
+      }
+      if (addTaskCloseBtn) {
+        addTaskCloseBtn.addEventListener('click', () => closeAddTaskModal());
+      }
+      if (addTaskModal) {
+        addTaskModal.addEventListener('click', event => {
+          if (event.target === addTaskModal) {
+            closeAddTaskModal();
+          }
+        });
+      }
+      if (addTaskLevelField) {
+        addTaskLevelField.addEventListener('change', event => {
+          updateAddTaskParentOptions(event.target.value);
+        });
+      }
+      document.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && addTaskModal && addTaskModal.classList.contains('is-open')) {
+          closeAddTaskModal();
+        }
+      });
+      if (addTaskParentField && addTaskLevelField) {
+        updateAddTaskParentOptions(addTaskLevelField.value);
+      }
+
+      function updateToolbarState() {
+        const hasProject = Boolean(currentProject);
+        const hasRows = currentRows.length > 0;
+        uploadTrigger.disabled = !hasProject;
+        changeProjectBtn.disabled = !hasProject;
+        downloadBtn.disabled = !hasProject || !hasRows;
+        if (reportBtn) {
+          reportBtn.disabled = !hasProject || !hasRows || isGeneratingReport;
+          reportBtn.textContent = isGeneratingReport ? 'Report 생성중…' : 'Report';
+        }
+        updateAutoSaveStatus(hasProject);
+      }
+
+      function updateAutoSaveStatus(hasProject) {
+        if (!autoSaveStatus) {
+          return;
+        }
+        autoSaveStatus.classList.remove('is-warning', 'is-pending', 'is-error');
+        if (!hasProject) {
+          autoSaveStatus.textContent = '프로젝트 선택 필요';
+          return;
+        }
+        if (isSavingProject || pendingServerSyncCount > 0) {
+          autoSaveStatus.textContent = '자동 저장 중…';
+          autoSaveStatus.classList.add('is-pending');
+          return;
+        }
+        if (hasUnsavedChanges) {
+          autoSaveStatus.textContent = '체크 필요';
+          autoSaveStatus.classList.add('is-warning');
+          return;
+        }
+        autoSaveStatus.textContent = '자동 저장 완료';
+      }
+
+      function markPendingServerSync() {
+        pendingServerSyncCount += 1;
+        hasUnsavedChanges = true;
+        updateProjectIndicator();
+        updateToolbarState();
+      }
+
+      function resolvePendingServerSync() {
+        pendingServerSyncCount = Math.max(0, pendingServerSyncCount - 1);
+        hasUnsavedChanges = manualUnsavedChanges || pendingServerSyncCount > 0;
+        updateProjectIndicator();
+        updateToolbarState();
+      }
+
+      function updateProjectIndicator() {
+        if (!currentProject) {
+          headerTitle.textContent = '프로젝트 미선택';
+          updateHeaderDate();
+          return;
+        }
+        if (hasUnsavedChanges) {
+          headerTitle.textContent = '프로젝트*: ' + currentProject;
+        } else {
+          headerTitle.textContent = '프로젝트: ' + currentProject;
+        }
+        updateHeaderDate();
+      }
+
+      function updateHeaderDate() {
+        if (!headerDate) {
+          return;
+        }
+        const now = new Date();
+        const formatted = now.toLocaleDateString('ko-KR', {
+          year: 'numeric',
+          month: '2-digit',
+          day: '2-digit',
+          weekday: 'short',
+          timeZone: 'Asia/Seoul'
+        });
+        headerDate.textContent = formatted;
+      }
+
+      function openProjectOverlay(forceRefresh = false) {
+        projectOverlay.classList.remove('hidden');
+        projectOverlayStatus.textContent = '';
+        if (forceRefresh || !projectListCache.length) {
+          fetchProjects();
+        } else {
+          renderProjectList(projectListCache);
+        }
+        setTimeout(() => {
+          if (projectNameInput) {
+            projectNameInput.focus();
+          }
+        }, 120);
+      }
+
+      function hideProjectOverlay() {
+        projectOverlay.classList.add('hidden');
+        updateToolbarState();
+      }
+
+      async function fetchProjects() {
+        projectOverlayStatus.textContent = '';
+        refreshProjectsBtn.disabled = true;
+        projectList.innerHTML =
+          '<div class="loader" style="margin: 0 auto;">프로젝트 목록을 불러오는 중…</div>';
+        try {
+          const response = await fetch('/api/projects');
+          if (!response.ok) {
+            throw new Error('프로젝트 목록을 불러오지 못했습니다.');
+          }
+          const payload = await response.json();
+          projectListCache = Array.isArray(payload.projects) ? payload.projects : [];
+          renderProjectList(projectListCache);
+          if (!projectListCache.length) {
+            projectOverlayStatus.textContent = '등록된 프로젝트가 없습니다. 새 프로젝트를 만들어 주세요.';
+          }
+          return projectListCache;
+        } catch (error) {
+          console.error(error);
+          projectOverlayStatus.textContent =
+            error.message || '프로젝트 목록을 불러오는 중 오류가 발생했습니다.';
+          projectList.innerHTML = '';
+          return [];
+        } finally {
+          refreshProjectsBtn.disabled = false;
+        }
+      }
+
+      function renderProjectList(projects) {
+        projectList.innerHTML = '';
+        if (!projects.length) {
+          const empty = document.createElement('div');
+          empty.className = 'project-panel__desc';
+          empty.textContent = '등록된 프로젝트가 없습니다.';
+          projectList.appendChild(empty);
+          return;
+        }
+        projects.forEach(project => {
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'project-option';
+          button.disabled = isLoadingProject;
+          const nameSpan = document.createElement('span');
+          nameSpan.className = 'project-option__name';
+          nameSpan.textContent = project.name;
+          const metaSpan = document.createElement('span');
+          metaSpan.className = 'project-option__meta';
+          metaSpan.textContent = project.hasJson
+            ? (project.hasCsv ? 'JSON · CSV 저장됨' : 'JSON 저장됨')
+            : (project.hasCsv ? 'CSV만 존재' : '데이터 없음');
+          button.appendChild(nameSpan);
+          button.appendChild(metaSpan);
+          button.addEventListener('click', () => handleProjectSelection(project.name));
+          projectList.appendChild(button);
+        });
+      }
+
+      function toggleProjectButtons(disabled) {
+        projectList
+          .querySelectorAll('button.project-option')
+          .forEach(button => (button.disabled = disabled));
+      }
+
+      async function handleProjectSelection(projectName) {
+        if (!projectName || isLoadingProject) {
+          return;
+        }
+        if (hasUnsavedChanges && projectName !== currentProject) {
+          const confirmed = window.confirm(
+            '저장되지 않은 변경사항이 있습니다. 다른 프로젝트로 이동하시겠습니까?'
+          );
+          if (!confirmed) {
+            return;
+          }
+        }
+        isLoadingProject = true;
+        toggleProjectButtons(true);
+        projectOverlayStatus.textContent = projectName + ' 프로젝트 데이터를 불러오는 중입니다…';
+        try {
+          await loadProjectData(projectName);
+          hideProjectOverlay();
+        } catch (error) {
+          projectOverlayStatus.textContent = error.message || '프로젝트를 불러오지 못했습니다.';
+        } finally {
+          isLoadingProject = false;
+          toggleProjectButtons(false);
+        }
+      }
+
+      async function handleProjectCreate(event) {
+        event.preventDefault();
+        const rawName = projectNameInput.value ? projectNameInput.value.trim() : '';
+        if (!rawName) {
+          projectOverlayStatus.textContent = '프로젝트 이름을 입력하세요.';
+          return;
+        }
+        projectOverlayStatus.textContent = rawName + ' 프로젝트를 만드는 중입니다…';
+        refreshProjectsBtn.disabled = true;
+        try {
+          const response = await fetch('/api/projects', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: rawName })
+          });
+          if (response.status === 409) {
+            projectOverlayStatus.textContent = '이미 존재하는 프로젝트입니다.';
+            return;
+          }
+          if (!response.ok) {
+            const payload = await response.json().catch(() => ({}));
+            throw new Error(payload.message || '프로젝트를 생성하지 못했습니다.');
+          }
+          projectNameInput.value = '';
+          await fetchProjects();
+          await handleProjectSelection(rawName);
+        } catch (error) {
+          console.error(error);
+          projectOverlayStatus.textContent =
+            error.message || '프로젝트 생성 중 오류가 발생했습니다.';
+        } finally {
+          refreshProjectsBtn.disabled = false;
+        }
+      }
+
+      async function loadProjectData(projectName) {
+        try {
+          setStatus(projectName + ' 프로젝트 데이터를 불러오는 중입니다…');
+          const response = await fetch('/api/projects/' + encodeURIComponent(projectName) + '/data');
+          const payload = await response.json().catch(() => null);
+          if (!response.ok) {
+            const message = payload && payload.message ? payload.message : '프로젝트 데이터를 불러오지 못했습니다.';
+            throw new Error(message);
+          }
+          const hydratedRows = hydrateRowsFromJson(payload && payload.rows);
+          const rows = sortRowsByHierarchy(hydratedRows);
+          updateAllPlanned(rows);
+          currentRows = rows;
+          currentRowLookup = new Map(rows.map(row => [row.wbsId, row]));
+          currentProject = projectName;
+          hasUnsavedChanges = false;
+          manualUnsavedChanges = false;
+          pendingServerSyncCount = 0;
+          updateValidationState(rows);
+          await chatbotController.setProject(currentProject);
+          renderChart(rows);
+          updateProjectIndicator();
+          updateToolbarState();
+          setStatus(
+            projectName + ' 프로젝트를 불러왔습니다. 총 ' + rows.length + '건의 작업이 표시됩니다.'
+          );
+        } catch (error) {
+          setStatus(error.message || '프로젝트를 불러오지 못했습니다.', 'error');
+          throw error;
+        }
+      }
+
+      function hydrateRowsFromJson(rows) {
+        if (!Array.isArray(rows)) {
+          throw new Error('프로젝트 JSON 데이터 형식이 올바르지 않습니다.');
+        }
+        return rows.map((row, index) => {
+          const context = 'JSON ' + (index + 1) + '행';
+          if (row && typeof row === 'object' && 'wbsId' in row) {
+            return createTaskRecordFromStorage(row, context);
+          }
+          return createTaskRecordFromLegacyJson(row, context);
+        });
+      }
+
+      function handleFileInput(event) {
+        const file = event.target.files && event.target.files[0];
+        event.target.value = '';
+        if (!file) {
+          return;
+        }
+        if (!currentProject) {
+          setStatus('먼저 프로젝트를 선택하세요.', 'error');
+          return;
+        }
+        if (file.type && file.type !== 'text/csv' && file.type !== 'application/vnd.ms-excel') {
+          setStatus('CSV 파일만 업로드할 수 있습니다.', 'error');
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = async () => {
+          try {
+            const rowCount = handleCsvText(reader.result);
+            hasUnsavedChanges = true;
+            manualUnsavedChanges = true;
+            updateProjectIndicator();
+            updateToolbarState();
+            try {
+              await persistProjectRows({
+                statusInProgress: 'CSV 업로드 데이터를 저장하는 중입니다…',
+                successMessage:
+                  '업로드한 CSV(' +
+                  file.name +
+                  ', ' +
+                  rowCount +
+                  '건)을 적용하고 프로젝트 폴더에 저장했습니다.',
+                errorMessagePrefix: 'CSV를 적용했지만 프로젝트 폴더에 저장하지 못했습니다.'
+              });
+            } catch (saveError) {
+              console.error(saveError);
+            }
+          } catch (error) {
+            setStatus(error.message || 'CSV를 처리하는 중 오류가 발생했습니다.', 'error');
+          }
+        };
+        reader.onerror = () => {
+          setStatus('CSV 파일을 읽는 중 오류가 발생했습니다.', 'error');
+        };
+        reader.readAsText(file, 'utf-8');
+      }
+
+      function handleDownload() {
+        if (!currentRows.length) {
+          setStatus('다운로드할 데이터가 없습니다.', 'error');
+          return;
+        }
+        updateAllPlanned(currentRows);
+        const csvContent = generateCsvContent(currentRows, true);
+        const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = (currentProject || 'wbs') + '_export.csv';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        setStatus('현재 WBS 데이터를 CSV로 내려받았습니다.');
+      }
+
+      async function handleServerSave() {
+        if (!currentProject) {
+          setStatus('먼저 프로젝트를 선택하세요.', 'error');
+          return;
+        }
+        if (!currentRows.length) {
+          setStatus('저장할 데이터가 없습니다.', 'error');
+          return;
+        }
+        try {
+          await persistProjectRows({
+            statusInProgress: '서버에 WBS 데이터를 저장하는 중입니다…',
+            successMessage: '서버에 WBS 데이터를 저장했습니다.',
+            errorMessagePrefix: '프로젝트 데이터를 저장하지 못했습니다.'
+          });
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      async function persistReportDocument({ projectName, fileName, html }) {
+        const response = await fetch(
+          '/api/projects/' + encodeURIComponent(projectName) + '/report',
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
+            body: JSON.stringify({ fileName, html })
+          }
+        );
+        let payload = null;
+        try {
+          payload = await response.json();
+        } catch (error) {
+          console.warn('Failed to parse report response', error);
+        }
+        if (!response.ok) {
+          const message =
+            (payload && payload.message) || '리포트를 저장하지 못했습니다.';
+          const error = new Error(message);
+          error.response = payload;
+          throw error;
+        }
+        return payload || { fileName };
+      }
+
+      async function handleReportGeneration() {
+        if (isGeneratingReport) {
+          return;
+        }
+        if (!currentProject) {
+          setStatus('먼저 프로젝트를 선택하세요.', 'error');
+          return;
+        }
+        if (!currentRows.length) {
+          setStatus('생성할 WBS 데이터가 없습니다.', 'error');
+          return;
+        }
+        const generatedAt = new Date();
+        const fileName = buildReportFilename(currentProject, generatedAt);
+        const html = generateReportHtml({
+          projectName: currentProject,
+          rows: currentRows,
+          generatedAt,
+          fileName
+        });
+        let previewWindow = null;
+        try {
+          previewWindow = window.open('', '_blank');
+          if (previewWindow) {
+            try {
+              previewWindow.opener = null;
+            } catch (error) {
+              console.warn('Unable to clear preview opener', error);
+            }
+            previewWindow.document.write(
+              "<p style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 1.5rem;\">리포트를 준비하고 있습니다…</p>"
+            );
+            previewWindow.document.close();
+          }
+        } catch (error) {
+          console.warn('Failed to open preview window', error);
+          previewWindow = null;
+        }
+        isGeneratingReport = true;
+        updateToolbarState();
+        setStatus('리포트를 생성하는 중입니다…');
+        try {
+          const response = await persistReportDocument({
+            projectName: currentProject,
+            fileName,
+            html
+          });
+          const targetUrl = response && response.url ? response.url : '';
+          const absoluteUrl = targetUrl
+            ? new URL(targetUrl, window.location.origin).href
+            : '';
+          if (previewWindow && absoluteUrl) {
+            previewWindow.location.href = absoluteUrl;
+          } else if (previewWindow) {
+            previewWindow.document.open();
+            previewWindow.document.write(html);
+            previewWindow.document.close();
+          } else if (absoluteUrl) {
+            window.open(absoluteUrl, '_blank', 'noopener');
+          } else {
+            const fallbackWindow = window.open('', '_blank');
+            if (fallbackWindow) {
+              try {
+                fallbackWindow.opener = null;
+              } catch (error) {
+                console.warn('Unable to clear fallback opener', error);
+              }
+              fallbackWindow.document.write(html);
+              fallbackWindow.document.close();
+            }
+          }
+          const savedFile =
+            (response && response.fileName) || fileName;
+          setStatus('리포트를 생성하고 저장했습니다: ' + savedFile);
+        } catch (error) {
+          if (previewWindow && !previewWindow.closed) {
+            previewWindow.close();
+          }
+          setStatus(error.message || '리포트를 생성하지 못했습니다.', 'error');
+        } finally {
+          isGeneratingReport = false;
+          updateToolbarState();
+        }
+      }
+
+      async function persistProjectRows(options = {}) {
+        if (!currentProject) {
+          const error = new Error('먼저 프로젝트를 선택하세요.');
+          if (!options.silent) {
+            setStatus(error.message, 'error');
+          }
+          throw error;
+        }
+        if (!currentRows.length) {
+          const error = new Error('저장할 데이터가 없습니다.');
+          if (!options.silent) {
+            setStatus(error.message, 'error');
+          }
+          throw error;
+        }
+        const {
+          statusInProgress,
+          successMessage,
+          errorMessagePrefix,
+          silent = false
+        } = options;
+        if (!silent && statusInProgress) {
+          setStatus(statusInProgress);
+        }
+        isSavingProject = true;
+        updateToolbarState();
+        try {
+          updateAllPlanned(currentRows);
+          const response = await fetch(
+            '/api/projects/' + encodeURIComponent(currentProject) + '/data',
+            {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json; charset=utf-8' },
+              body: JSON.stringify({ rows: currentRows })
+            }
+          );
+          const payload = await response.json().catch(() => null);
+          if (!response.ok) {
+            const message =
+              payload && payload.message ? payload.message : '프로젝트 데이터를 저장하지 못했습니다.';
+            throw new Error(message);
+          }
+          hasUnsavedChanges = false;
+          manualUnsavedChanges = false;
+          updateProjectIndicator();
+          if (!silent) {
+            setStatus(successMessage || '서버에 WBS 데이터를 저장했습니다.');
+          }
+          return true;
+        } catch (error) {
+          hasUnsavedChanges = true;
+          manualUnsavedChanges = true;
+          updateProjectIndicator();
+          if (!silent) {
+            const prefix = errorMessagePrefix ? errorMessagePrefix + ' ' : '';
+            setStatus(
+              (prefix + (error.message || '프로젝트 데이터를 저장하지 못했습니다.')).trim(),
+              'error'
+            );
+          }
+          throw error;
+        } finally {
+          isSavingProject = false;
+          updateToolbarState();
+        }
+      }
+
+      async function persistTaskField(projectName, wbsId, changes) {
+        if (!projectName) {
+          throw new Error('프로젝트를 먼저 선택하세요.');
+        }
+        if (!wbsId) {
+          throw new Error('업데이트할 작업을 찾지 못했습니다.');
+        }
+        const response = await fetch(
+          '/api/projects/' +
+            encodeURIComponent(projectName) +
+            '/wbs/' +
+            encodeURIComponent(wbsId),
+          {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json; charset=utf-8' },
+            body: JSON.stringify(changes)
+          }
+        );
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+          const message =
+            payload && payload.message ? payload.message : '작업을 업데이트하지 못했습니다.';
+          throw new Error(message);
+        }
+        return payload;
+      }
+
+      async function deleteTaskFromProject(projectName, wbsId) {
+        if (!projectName) {
+          throw new Error('프로젝트를 먼저 선택하세요.');
+        }
+        if (!wbsId) {
+          throw new Error('삭제할 작업을 찾지 못했습니다.');
+        }
+        const response = await fetch(
+          '/api/projects/' +
+            encodeURIComponent(projectName) +
+            '/wbs/' +
+            encodeURIComponent(wbsId),
+          {
+            method: 'DELETE'
+          }
+        );
+        const payload = await response.json().catch(() => null);
+        if (!response.ok) {
+          const message =
+            payload && payload.message ? payload.message : '작업을 삭제하지 못했습니다.';
+          throw new Error(message);
+        }
+        return payload;
+      }
+
+      function revertRecordField(record, field, previousValue) {
+        if (!record) {
+          return;
+        }
+        record[field] = previousValue;
+        if (field === 'startDate' || field === 'endDate') {
+          updateRecordPlanned(record);
+        }
+        if (field === 'progress') {
+          record.progressDisplay = Number.isFinite(record.progress) ? record.progress + '%' : '';
+        }
+        if (field === 'status') {
+          record.status = normalizeStatusValue(record.status);
+        }
+        if (field === 'priority') {
+          record.priority = normalizePriorityValue(record.priority);
+        }
+      }
+
+      function handleAutomaticFieldUpdates(updates) {
+        if (!Array.isArray(updates) || !updates.length) {
+          return;
+        }
+        let requiresRefresh = false;
+        updates.forEach(update => {
+          if (!update || !update.wbsId || !update.field) {
+            return;
+          }
+          const { wbsId, field, value, previousValue } = update;
+          const record = currentRowLookup.get(wbsId) || null;
+          if (record) {
+            record[field] = value;
+            if (field === 'progress') {
+              record.progressDisplay = Number.isFinite(value) ? value + '%' : '';
+            }
+            currentRowLookup.set(wbsId, record);
+            const updated = syncTaskItemWithRecord(record, field);
+            requiresRefresh = requiresRefresh || updated;
+          }
+          queueFieldAutoSave({
+            wbsId,
+            field,
+            value,
+            previousValue,
+            record
+          });
+        });
+        if (!requiresRefresh) {
+          return;
+        }
+        if (hasRenderedOnce) {
+          refreshChartSurface();
+          return;
+        }
+        renderChart(currentRows);
+      }
+
+      function queueFieldAutoSave({ wbsId, field, value, previousValue, record }) {
+        if (!currentProject || !wbsId) {
+          return;
+        }
+        const projectSnapshot = currentProject;
+        markPendingServerSync();
+        persistTaskField(projectSnapshot, wbsId, { [field]: value })
+          .then(() => {
+            if (statusMessage && statusMessage.classList.contains('error')) {
+              setStatus('');
+            }
+          })
+          .catch(error => {
+            if (currentProject !== projectSnapshot) {
+              return;
+            }
+            setStatus(error.message || '자동 저장에 실패했습니다.', 'error');
+            if (record) {
+              revertRecordField(record, field, previousValue);
+              if (field === 'weight') {
+                updateValidationState(currentRows);
+              } else {
+                updateRecordValidation(record);
+              }
+              renderChart(currentRows);
+              selectTaskByWbsId(wbsId, { suppressFocus: true });
+            }
+          })
+          .finally(() => {
+            resolvePendingServerSync();
+          });
+      }
+
+      function handleCsvText(rawText) {
+        const csvText = (rawText || '').replace(/^\uFEFF/, '');
+        const parsedRows = parseAndValidate(csvText);
+        if (!parsedRows.length) {
+          throw new Error('CSV에서 유효한 작업 데이터를 찾지 못했습니다.');
+        }
+        const rows = sortRowsByHierarchy(parsedRows);
+        updateAllPlanned(rows);
+        currentRows = rows;
+        currentRowLookup = new Map(rows.map(row => [row.wbsId, row]));
+        updateValidationState(rows);
+        renderChart(rows);
+        updateToolbarState();
+        return rows.length;
+      }
+
+      function renderChart(rows, options = {}) {
+        const { allowRebuild = true } = options || {};
+        if (!ensureGanttChart()) {
+          return;
+        }
+        updateAllPlanned(rows);
+        if (!hasRenderedOnce) {
+          target.innerHTML = '';
+          hasRenderedOnce = true;
+        }
+        currentRowLookup = new Map(rows.map(row => [row.wbsId, row]));
+
+        if (typeof ganttChart.ClearTasks === 'function') {
+          ganttChart.ClearTasks();
+        } else if (Array.isArray(ganttChart.vTaskList)) {
+          ganttChart.vTaskList.length = 0;
+        }
+
+        const internalIdMap = new Map();
+        rows.forEach((row, index) => internalIdMap.set(row.wbsId, index + 1));
+
+        if (selectedTaskWbsId && !internalIdMap.has(selectedTaskWbsId)) {
+          selectTaskByWbsId(null);
+        }
+
+        const parentCandidates = new Set();
+        rows.forEach(row => {
+          if (row.parentWbsId && internalIdMap.has(row.parentWbsId)) {
+            parentCandidates.add(row.parentWbsId);
+          }
+        });
+        rows.forEach(row => {
+          if (!row || !row.wbsId) {
+            return;
+          }
+          row.hasChildren = parentCandidates.has(row.wbsId);
+        });
+
+        rows.forEach(row => {
+          const internalId = internalIdMap.get(row.wbsId);
+          const parentInternalId =
+            row.parentWbsId && internalIdMap.has(row.parentWbsId)
+              ? internalIdMap.get(row.parentWbsId)
+              : 0;
+          const isGroup = parentCandidates.has(row.wbsId);
+          const taskClass = getTaskClassName(row);
+          row.taskCssClass = taskClass;
+          ganttChart.AddTaskItemObject({
+            pID: internalId,
+            pName: row.taskName || row.wbsId,
+            pStart: toGanttStartOfDay(row.startDate),
+            pEnd: toGanttInclusiveEnd(row.endDate),
+            pClass: taskClass,
+            pLink: '',
+            pMile: 0,
+            pRes: row.owner || '',
+            pComp: Number.isFinite(row.progress) ? row.progress : 0,
+            pGroup: isGroup ? 1 : 0,
+            pParent: parentInternalId || 0,
+            pOpen: 1,
+            pCaption: Number.isFinite(row.progress) ? row.progress + '%' : '',
+            pPlanClass: taskClass,
+            wbsId: row.wbsId,
+            taskName: row.taskName,
+            level: row.level,
+            parentWbsId: row.parentWbsId,
+            startDate: row.startDate,
+            endDate: row.endDate,
+            duration: row.duration,
+            progress: row.progress,
+            planned: row.planned,
+            owner: row.owner,
+            costEstimate: row.costEstimate,
+            priority: row.priority,
+            weight: row.weight,
+            status: row.status,
+            deliverable: row.deliverable,
+            acceptanceCriteria: row.acceptanceCriteria,
+            reviewDate: row.reviewDate,
+            progressDisplay: row.progressDisplay,
+            record: row
+          });
+        });
+
+        ganttChart.Draw();
+        if (typeof ganttChart.DrawDependencies === 'function') {
+          ganttChart.DrawDependencies();
+        }
+        normalizeTaskTable(ganttChart);
+        makeTableEditable(ganttChart);
+        formatGanttDateHeaders(ganttChart);
+        if (selectedTaskWbsId) {
+          selectTaskByWbsId(selectedTaskWbsId, { suppressFocus: true });
+        }
+        applyValidationState(currentValidationState);
+        if (allowRebuild && Array.isArray(rows) && rows.length > 0 && target) {
+          const hasTaskRows = Boolean(target.querySelector('.gtasktable tr.task-row'));
+          const noDataLabel = target.querySelector('.gtasknolist-label');
+          if (!hasTaskRows && noDataLabel) {
+          console.warn(
+            '[WBS] 감지: 데이터는 있지만 간트 테이블에 "No tasks found"가 표시되어 차트를 재초기화합니다.'
+          );
+          try {
+            rebuildGanttChartInstance();
+            renderChart(rows, { allowRebuild: false });
+          } catch (error) {
+            console.error('간트 차트를 재초기화하지 못했습니다.', error);
+            renderFatalError(error);
+          }
+          }
+        }
+      }
+
+      function updateValidationState(rows) {
+        currentValidationState = evaluateRecords(rows || []);
+        (rows || []).forEach(row => {
+          row.validationIssues = currentValidationState.issuesByWbsId.get(row.wbsId) || [];
+        });
+        applyValidationState(currentValidationState);
+        handleAutomaticFieldUpdates(currentValidationState.autoUpdates || []);
+      }
+
+      function updateRecordValidation(record) {
+        if (!record) {
+          return;
+        }
+        if (!(currentValidationState && currentValidationState.issuesByWbsId instanceof Map)) {
+          currentValidationState = {
+            issuesByWbsId: new Map(),
+            hasIssues: false
+          };
+        }
+        const issues = evaluateRecord(record, { rows: currentRows });
+        if (issues.length) {
+          currentValidationState.issuesByWbsId.set(record.wbsId, issues);
+        } else {
+          currentValidationState.issuesByWbsId.delete(record.wbsId);
+        }
+        currentValidationState.hasIssues = currentValidationState.issuesByWbsId.size > 0;
+        record.validationIssues = issues;
+        applyValidationState(currentValidationState);
+      }
+
+      function applyValidationState(state) {
+        const body = document.body;
+        if (body) {
+          if (state && state.hasIssues) {
+            body.setAttribute('data-has-validation-issues', 'true');
+          } else {
+            body.removeAttribute('data-has-validation-issues');
+          }
+        }
+        const taskTable = document.querySelector('.gtasktable');
+        if (taskTable) {
+          const rows = taskTable.querySelectorAll('tr.task-row');
+          rows.forEach(row => {
+            row.classList.remove('has-validation-error', 'has-validation-warning');
+            row.removeAttribute('data-validation-messages');
+            row.removeAttribute('title');
+            row.removeAttribute('data-weight-invalid');
+          });
+          if (state && state.issuesByWbsId instanceof Map) {
+            state.issuesByWbsId.forEach((issues, wbsId) => {
+              if (!issues || !issues.length) {
+                return;
+              }
+              const selector =
+                '.gtasktable tr.task-row[data-wbs-id="' + cssEscape(wbsId) + '"]';
+              const row = taskTable.querySelector(selector);
+              if (!row) {
+                return;
+              }
+              const hasError = issues.some(issue => issue.severity === 'error');
+              row.classList.add(hasError ? 'has-validation-error' : 'has-validation-warning');
+              const message = issues.map(issue => issue.message).join('\n');
+              row.dataset.validationMessages = message;
+              row.title = message;
+              if (issues.some(issue => issue.field === 'weight')) {
+                row.setAttribute('data-weight-invalid', 'true');
+              }
+            });
+          }
+        }
+        document.dispatchEvent(new CustomEvent('validation:updated', { detail: state }));
+      }
+
+      function parseAndValidate(csvText) {
+        return parseCsvText(csvText, { Papa });
+      }
+
+      const HIERARCHY_ROOT_KEY = '__HIERARCHY_ROOT__';
+
+      function normalizeHierarchyKey(value) {
+        if (value === undefined || value === null) {
+          return '';
+        }
+        return value.toString().trim();
+      }
+
+      function getComparableDateValue(value) {
+        if (!value && value !== 0) {
+          return '9999-12-31';
+        }
+        return value.toString();
+      }
+
+      function sortRowsByHierarchy(rows) {
+        if (!Array.isArray(rows)) {
+          return [];
+        }
+        if (rows.length <= 1) {
+          return rows.slice();
+        }
+        const recordMap = new Map();
+        rows.forEach(row => {
+          if (!row) {
+            return;
+          }
+          const key = normalizeHierarchyKey(row.wbsId);
+          if (key) {
+            recordMap.set(key, row);
+          }
+        });
+        const childrenByParent = new Map();
+        rows.forEach(row => {
+          if (!row) {
+            return;
+          }
+          const parentCandidate = normalizeHierarchyKey(row.parentWbsId);
+          const resolvedParentKey =
+            parentCandidate && recordMap.has(parentCandidate)
+              ? parentCandidate
+              : HIERARCHY_ROOT_KEY;
+          if (!childrenByParent.has(resolvedParentKey)) {
+            childrenByParent.set(resolvedParentKey, []);
+          }
+          childrenByParent.get(resolvedParentKey).push(row);
+        });
+        const compareRecords = (a, b) => {
+          const startA = getComparableDateValue(a && a.startDate);
+          const startB = getComparableDateValue(b && b.startDate);
+          if (startA < startB) return -1;
+          if (startA > startB) return 1;
+          const endA = getComparableDateValue(a && a.endDate);
+          const endB = getComparableDateValue(b && b.endDate);
+          if (endA < endB) return -1;
+          if (endA > endB) return 1;
+          const wbsA = normalizeHierarchyKey(a && a.wbsId);
+          const wbsB = normalizeHierarchyKey(b && b.wbsId);
+          if (wbsA < wbsB) return -1;
+          if (wbsA > wbsB) return 1;
+          return 0;
+        };
+        const ordered = [];
+        function traverse(parentKey, ancestry = new Set()) {
+          const children = childrenByParent.get(parentKey);
+          if (!children || !children.length) {
+            return;
+          }
+          children
+            .slice()
+            .sort(compareRecords)
+            .forEach(child => {
+              if (!child) {
+                return;
+              }
+              const childKey = normalizeHierarchyKey(child.wbsId);
+              ordered.push(child);
+              if (!childKey || ancestry.has(childKey)) {
+                return;
+              }
+              ancestry.add(childKey);
+              traverse(childKey, ancestry);
+              ancestry.delete(childKey);
+            });
+        }
+        traverse(HIERARCHY_ROOT_KEY, new Set());
+        if (ordered.length < rows.length) {
+          const seen = new Set(ordered.map(row => row && row.wbsId));
+          rows
+            .filter(row => row && !seen.has(row.wbsId))
+            .sort(compareRecords)
+            .forEach(row => ordered.push(row));
+        }
+        return ordered;
+      }
+
+
+      function generateCsvContent(rows, withBom = true) {
+        const header = FIELD_DEFS.map(field => field.header);
+        const csvLines = [header.join(',')];
+        rows.forEach(row => {
+          const line = FIELD_DEFS.map(field => {
+            let value = row[field.key];
+            if (field.key === 'progress') {
+              value = Number.isFinite(value) ? value : '';
+            } else if (field.key === 'planned') {
+              value = Number.isFinite(value) ? value : '';
+            } else if (field.key === 'reviewDate') {
+              value = value || '';
+            } else if (value === undefined || value === null) {
+              value = '';
+            }
+            return escapeCsv(value);
+          }).join(',');
+          csvLines.push(line);
+        });
+        const csv = csvLines.join('\r\n');
+        return withBom ? '\uFEFF' + csv : csv;
+      }
+
+      function escapeCsv(value) {
+        const stringValue = (value ?? '').toString();
+        const needsQuotes = /[",\n]/.test(stringValue);
+        let escaped = stringValue.replace(/"/g, '""');
+        if (needsQuotes) {
+          escaped = '"' + escaped + '"';
+        }
+        return escaped;
+      }
+
+      function selectTaskByWbsId(wbsId, options = {}) {
+        const { suppressFocus = false } = options || {};
+        if (!wbsId) {
+          selectedTaskWbsId = null;
+          clearDetailPanel();
+          updateRowSelection();
+          return;
+        }
+        const record = currentRowLookup.get(wbsId);
+        if (!record) {
+          selectedTaskWbsId = null;
+          clearDetailPanel();
+          updateRowSelection();
+          return;
+        }
+        selectedTaskWbsId = wbsId;
+        drawTaskDetails(record);
+        updateRowSelection();
+        if (!suppressFocus) {
+          focusRowByWbsId(wbsId);
+        }
+      }
+
+      function createDetailFieldControl(field, record, recordValue) {
+        if (!record || !record.wbsId) {
+          return null;
+        }
+        const editorConfig = DETAIL_FIELD_EDITORS[field.key];
+        if (!editorConfig) {
+          return null;
+        }
+        const elementType = editorConfig.element || 'input';
+        let control;
+        if (elementType === 'textarea') {
+          control = document.createElement('textarea');
+        } else if (elementType === 'select') {
+          control = document.createElement('select');
+        } else {
+          control = document.createElement('input');
+          control.type = editorConfig.inputType || 'text';
+        }
+        if (editorConfig.inputType && elementType !== 'select' && elementType !== 'textarea') {
+          control.type = editorConfig.inputType;
+        }
+        if (editorConfig.attributes) {
+          Object.entries(editorConfig.attributes).forEach(([key, value]) => {
+            if (value !== undefined && value !== null) {
+              control.setAttribute(key, value);
+            }
+          });
+        }
+        control.dataset.fieldKey = field.key;
+        control.dataset.wbsId = record.wbsId;
+        control.classList.add('detail-panel__input');
+        if (elementType === 'textarea') {
+          control.classList.add('detail-panel__input--textarea');
+        }
+        const initialValue =
+          typeof editorConfig.toInputValue === 'function'
+            ? editorConfig.toInputValue(recordValue, record)
+            : recordValue === undefined || recordValue === null
+            ? ''
+            : recordValue.toString();
+        if (elementType === 'select') {
+          if (editorConfig.placeholder) {
+            const placeholderOption = document.createElement('option');
+            placeholderOption.value = '';
+            placeholderOption.textContent = editorConfig.placeholder;
+            control.appendChild(placeholderOption);
+          }
+          const options = Array.isArray(editorConfig.options) ? editorConfig.options : [];
+          options.forEach(optionValue => {
+            if (optionValue === undefined || optionValue === null) {
+              return;
+            }
+            const optionEl = document.createElement('option');
+            if (typeof optionValue === 'string') {
+              optionEl.value = optionValue;
+              optionEl.textContent = optionValue;
+            } else if (typeof optionValue === 'object') {
+              const optionVal = Object.prototype.hasOwnProperty.call(optionValue, 'value')
+                ? optionValue.value
+                : '';
+              const optionLabel = Object.prototype.hasOwnProperty.call(optionValue, 'label')
+                ? optionValue.label
+                : optionVal;
+              optionEl.value = optionVal;
+              optionEl.textContent = optionLabel;
+            }
+            control.appendChild(optionEl);
+          });
+          if (initialValue && !Array.from(control.options).some(opt => opt.value === initialValue)) {
+            const extraOption = document.createElement('option');
+            extraOption.value = initialValue;
+            extraOption.textContent = initialValue;
+            control.appendChild(extraOption);
+          }
+          control.value = initialValue || '';
+        } else {
+          control.value = initialValue || '';
+        }
+        const eventName = editorConfig.event || 'change';
+        control.addEventListener(eventName, handleDetailFieldInput);
+        if (eventName !== 'change') {
+          control.addEventListener('change', handleDetailFieldInput);
+        }
+        control.addEventListener('input', event => {
+          clearInlineError(control);
+          if (typeof editorConfig.onInput === 'function') {
+            editorConfig.onInput(event, control, record);
+          }
+        });
+        control.addEventListener('blur', () => {
+          clearInlineError(control);
+        });
+        if (field.key === 'costEstimate') {
+          attachCostInputFormatting(control);
+        }
+        return control;
+      }
+
+      function createFieldGrid(fields, record, options = {}) {
+        const grid = document.createElement('div');
+        grid.className = 'detail-panel__grid';
+        if (options.className) {
+          options.className
+            .toString()
+            .split(/\s+/)
+            .filter(Boolean)
+            .forEach(cls => grid.classList.add(cls));
+        }
+        fields.forEach(field => {
+          const recordValue = record ? record[field.key] : undefined;
+          const formattedValue =
+            typeof field.formatter === 'function'
+              ? field.formatter(recordValue, record)
+              : recordValue;
+          const displayValue =
+            formattedValue === undefined || formattedValue === null || formattedValue === ''
+              ? '—'
+              : formattedValue.toString();
+          const item = document.createElement('div');
+          item.className = 'detail-panel__item';
+          if (field.fullWidth) {
+            item.classList.add('detail-panel__item--fullwidth');
+          }
+          if (field.className) {
+            field.className
+              .toString()
+              .split(/\s+/)
+              .filter(Boolean)
+              .forEach(cls => item.classList.add(cls));
+          }
+          const label = document.createElement('span');
+          label.className = 'detail-panel__label';
+          label.textContent = field.label;
+          item.appendChild(label);
+          if (field.key === 'progress') {
+            const progressBar = document.createElement('div');
+            progressBar.className = 'progress-bar';
+            const progressFill = document.createElement('div');
+            progressFill.className = 'progress-fill';
+            progressFill.style.width = Number.isFinite(record.progress) ? record.progress + '%' : '0%';
+            progressBar.appendChild(progressFill);
+            item.appendChild(progressBar);
+          } else {
+            const valueContainer = document.createElement('div');
+            valueContainer.className = 'detail-panel__value';
+            if (field.editor && record && record.wbsId) {
+              const control = createDetailFieldControl(field, record, recordValue);
+              if (control) {
+                valueContainer.appendChild(control);
+              } else {
+                valueContainer.textContent = displayValue;
+              }
+            } else {
+              if (field.badge || field.key === 'status') {
+                valueContainer.classList.add('badge');
+              }
+              valueContainer.textContent = displayValue;
+            }
+            item.appendChild(valueContainer);
+          }
+          grid.appendChild(item);
+        });
+        return grid;
+      }
+
+      function handleDetailFieldInput(event) {
+        event.stopPropagation();
+        const target = event.target;
+        if (!target || !target.dataset) {
+          return;
+        }
+        const fieldKey = target.dataset.fieldKey;
+        const wbsId = target.dataset.wbsId;
+        if (!fieldKey || !wbsId) {
+          return;
+        }
+        const editorConfig = DETAIL_FIELD_EDITORS[fieldKey];
+        if (!editorConfig) {
+          return;
+        }
+        const record = currentRowLookup.get(wbsId);
+        if (!record) {
+          window.alert('선택한 작업을 찾지 못했습니다.');
+          return;
+        }
+        const previousValue = record[fieldKey];
+        let parsedValue;
+        try {
+          const rawValue = target.value;
+          parsedValue =
+            typeof editorConfig.parse === 'function'
+              ? editorConfig.parse(rawValue, { record, field: fieldKey, wbsId })
+              : rawValue;
+        } catch (error) {
+          showInlineError(target, error.message || '값을 업데이트하지 못했습니다.');
+          resetDetailInputValue(target, editorConfig, previousValue, record);
+          target.focus();
+          return;
+        }
+        let applyResult;
+        try {
+          applyResult = applyCellValue({ wbsId, field: fieldKey, value: parsedValue, record });
+        } catch (error) {
+          showInlineError(target, error.message || '값을 업데이트하지 못했습니다.');
+          resetDetailInputValue(target, editorConfig, record[fieldKey], record);
+          target.focus();
+          return;
+        }
+        clearInlineError(target);
+        resetDetailInputValue(target, editorConfig, record[fieldKey], record);
+        if (applyResult && applyResult.taskUpdated) {
+          refreshChartSurface();
+          selectTaskByWbsId(wbsId, { suppressFocus: true });
+        } else {
+          renderChart(currentRows);
+        }
+        if (applyResult) {
+          queueFieldAutoSave({
+            wbsId,
+            field: fieldKey,
+            value: record[fieldKey],
+            previousValue: applyResult.previousValue,
+            record
+          });
+        }
+      }
+
+      function handleTaskDelete(wbsId) {
+        if (!wbsId) {
+          window.alert('삭제할 작업을 찾지 못했습니다.');
+          return;
+        }
+        const record = currentRowLookup.get(wbsId);
+        if (!record) {
+          window.alert('삭제할 작업을 찾지 못했습니다.');
+          return;
+        }
+        const label = record.taskName
+          ? record.taskName + ' (' + record.wbsId + ')'
+          : record.wbsId;
+        const confirmed = window.confirm(
+          '\'' + label + '\' 작업을 삭제하시겠습니까?\n삭제 후에는 되돌릴 수 없습니다.'
+        );
+        if (!confirmed) {
+          return;
+        }
+        deleteTaskByWbsId(wbsId);
+      }
+
+      function deleteTaskByWbsId(wbsId) {
+        if (!wbsId) {
+          window.alert('삭제할 작업을 찾지 못했습니다.');
+          return false;
+        }
+        const index = currentRows.findIndex(row => row.wbsId === wbsId);
+        if (index === -1) {
+          window.alert('삭제할 작업을 찾지 못했습니다.');
+          return false;
+        }
+        if (
+          typeof globalThis !== 'undefined' &&
+          typeof globalThis.__cancelTaskTableEditor === 'function'
+        ) {
+          try {
+            globalThis.__cancelTaskTableEditor();
+          } catch {
+            /* ignore editor cancel failures */
+          }
+        }
+        const removedRecord = currentRows.splice(index, 1)[0];
+        if (currentRowLookup instanceof Map) {
+          currentRowLookup.delete(wbsId);
+        }
+        if (
+          currentValidationState &&
+          currentValidationState.issuesByWbsId instanceof Map
+        ) {
+          currentValidationState.issuesByWbsId.delete(wbsId);
+          currentValidationState.hasIssues = currentValidationState.issuesByWbsId.size > 0;
+        }
+        const nextSelection = currentRows[index] || currentRows[index - 1] || null;
+        selectedTaskWbsId = null;
+        updateValidationState(currentRows);
+        renderChart(currentRows);
+        if (nextSelection) {
+          selectTaskByWbsId(nextSelection.wbsId, { suppressFocus: true });
+        } else {
+          selectTaskByWbsId(null);
+        }
+        updateToolbarState();
+        if (!currentProject) {
+          return true;
+        }
+        const projectSnapshot = currentProject;
+        markPendingServerSync();
+        deleteTaskFromProject(projectSnapshot, wbsId)
+          .then(() => {
+            if (statusMessage && statusMessage.classList.contains('error')) {
+              setStatus('');
+            }
+          })
+          .catch(error => {
+            if (currentProject !== projectSnapshot) {
+              return;
+            }
+            setStatus(error.message || '작업을 삭제하지 못했습니다.', 'error');
+            const restoreIndex = Math.min(index, currentRows.length);
+            currentRows.splice(restoreIndex, 0, removedRecord);
+            currentRowLookup.set(wbsId, removedRecord);
+            updateValidationState(currentRows);
+            renderChart(currentRows);
+            selectTaskByWbsId(wbsId, { suppressFocus: true });
+          })
+          .finally(() => {
+            resolvePendingServerSync();
+          });
+        return true;
+      }
+
+      function drawTaskDetails(record) {
+        if (!detailPanel) {
+          return;
+        }
+        detailPanel.innerHTML = '';
+
+        const header = document.createElement('div');
+        header.className = 'detail-panel__header';
+
+        const title = document.createElement('h2');
+        title.className = 'detail-panel__title';
+        title.textContent = record.taskName || record.wbsId;
+        header.appendChild(title);
+
+        const actions = document.createElement('div');
+        actions.className = 'detail-panel__actions';
+        const deleteBtn = document.createElement('button');
+        deleteBtn.type = 'button';
+        deleteBtn.className = 'detail-panel__delete-btn';
+        deleteBtn.textContent = '작업 삭제';
+        deleteBtn.title = '선택한 작업을 삭제합니다.';
+        deleteBtn.disabled = !record || !record.wbsId;
+        deleteBtn.addEventListener('click', () => handleTaskDelete(record.wbsId));
+        actions.appendChild(deleteBtn);
+        header.appendChild(actions);
+        detailPanel.appendChild(header);
+
+        const subtitle = document.createElement('p');
+        subtitle.className = 'detail-panel__subtitle';
+        subtitle.textContent = record.wbsId;
+        detailPanel.appendChild(subtitle);
+
+        const basicSection = document.createElement('div');
+        basicSection.className = 'detail-panel__section';
+        const basicTitle = document.createElement('h3');
+        basicTitle.className = 'detail-panel__section-title';
+        basicTitle.textContent = '기본 정보';
+        basicSection.appendChild(basicTitle);
+        basicSection.appendChild(createFieldGrid(BASIC_FIELDS, record, { className: 'detail-panel__grid--basic' }));
+        detailPanel.appendChild(basicSection);
+
+        const separator = document.createElement('hr');
+        separator.className = 'detail-panel__separator';
+        detailPanel.appendChild(separator);
+
+        const detailSection = document.createElement('div');
+        detailSection.className = 'detail-panel__section';
+        const detailTitle = document.createElement('h3');
+        detailTitle.className = 'detail-panel__section-title';
+        detailTitle.textContent = '상세 정보';
+        detailSection.appendChild(detailTitle);
+        DETAIL_FIELD_GROUPS.forEach(group => {
+          if (!group || !Array.isArray(group.fields) || !group.fields.length) {
+            return;
+          }
+          detailSection.appendChild(createFieldGrid(group.fields, record, { className: group.className || '' }));
+        });
+        detailPanel.appendChild(detailSection);
+      }
+
+      function clearDetailPanel() {
+        if (!detailPanel) {
+          return;
+        }
+        detailPanel.innerHTML = detailPanelDefault;
+      }
+
+      function updateRowSelection() {
+        const rows = document.querySelectorAll('.gtasktable tr.task-row');
+        rows.forEach(row => {
+          const isMatch = selectedTaskWbsId && row.dataset.wbsId === selectedTaskWbsId;
+          row.classList.toggle('is-selected', Boolean(isMatch));
+          row.setAttribute('aria-selected', isMatch ? 'true' : 'false');
+        });
+      }
+
+      function focusRowByWbsId(wbsId) {
+        if (!wbsId) return;
+        const selector = '.gtasktable tr.task-row[data-wbs-id="' + cssEscape(wbsId) + '"]';
+        const targetRow = document.querySelector(selector);
+        if (targetRow && typeof targetRow.focus === 'function') {
+          targetRow.focus({ preventScroll: true });
+        }
+      }
+
+      function cssEscape(value) {
+        if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') {
+          return CSS.escape(value);
+        }
+        return value.replace(/["\\]/g, '\\$&');
+      }
+
+      function setStatus(message, type) {
+        if (!statusMessage) return;
+        if (type === 'error') {
+          statusMessage.textContent = message || '';
+          statusMessage.classList.add('error');
+          return;
+        }
+        statusMessage.classList.remove('error');
+        statusMessage.textContent = '';
+      }
+
+      function renderFatalError(error) {
+        console.error(error);
+        const message = error && error.message ? error.message : '알 수 없는 오류';
+        target.innerHTML =
+          '<div class="error">간트 차트를 불러오는 중 오류가 발생했습니다.<br>' +
+          message +
+          '<br><br>브라우저에서 직접 file://로 열면 CSV를 읽지 못할 수 있으니, 간단한 로컬 서버(예: <code>npx serve</code>)로 열어보세요.' +
+          '</div>';
+        setStatus(message, 'error');
+      }
+      function normalizeTaskTable(chart) {
+        if (!chart || !Array.isArray(chart.vTaskList)) {
+          return;
+        }
+
+        document.querySelectorAll('.gselector, .gselector-static').forEach(el => el.remove());
+
+        const applyWidth = (cell, width) => {
+          cell.style.width = width + 'px';
+          cell.style.minWidth = width + 'px';
+          cell.style.maxWidth = width + 'px';
+        };
+
+        const formatDateValue = value => {
+          if (!value) return '';
+          const trimmed = value.toString().trim();
+          if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) {
+            return trimmed;
+          }
+          const parsed = new Date(trimmed);
+          if (!isNaN(parsed.getTime())) {
+            return parsed.toISOString().slice(0, 10);
+          }
+          const parts = trimmed.match(/(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
+          if (parts) {
+            const [, y, m, d] = parts;
+            return [
+              y.padStart(4, '0'),
+              m.padStart(2, '0'),
+              d.padStart(2, '0')
+            ].join('-');
+          }
+          return trimmed;
+        };
+
+        const reorderRow = (row, isHeader, dataObject, taskItem) => {
+          if (!row) return;
+          const cells = Array.from(row.children);
+          const cellByClass = new Map();
+          cells.forEach(cell => {
+            const match = TASK_TABLE_COLUMNS.find(cfg => cell.classList.contains(cfg.cls));
+            if (match) {
+              cellByClass.set(match.cls, cell);
+            }
+          });
+
+        const newCells = TASK_TABLE_COLUMNS.map(column => {
+          const hadCell = cellByClass.has(column.cls);
+          let cell = hadCell ? cellByClass.get(column.cls) : null;
+          if (!cell) {
+            cell = document.createElement('td');
+            cell.className = column.cls;
+          }
+          if (isHeader) {
+            cell.innerHTML = '';
+            if (typeof column.renderHeader === 'function') {
+              column.renderHeader(cell);
+            } else {
+              cell.textContent = column.label || '\u00A0';
+            }
+          } else if (dataObject) {
+            if (column.cls === 'gtasklist') {
+              cell.innerHTML = '';
+              cell.classList.add('hierarchy-cell');
+              const isGroupTask =
+                taskItem && typeof taskItem.getGroup === 'function' && taskItem.getGroup() === 1;
+              if (isGroupTask && typeof taskItem.getID === 'function') {
+                const toggleBtn = document.createElement('button');
+                const originalId = taskItem.getID();
+                const isOpen = typeof taskItem.getOpen === 'function' ? taskItem.getOpen() === 1 : true;
+                toggleBtn.type = 'button';
+                toggleBtn.className = 'hierarchy-toggle' + (isOpen ? ' is-open' : '');
+                toggleBtn.setAttribute('aria-label', (isOpen ? '하위 작업 접기' : '하위 작업 펼치기'));
+                toggleBtn.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                toggleBtn.textContent = isOpen ? '-' : '+';
+                toggleBtn.addEventListener('click', event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  if (typeof JSGantt !== 'undefined' && typeof JSGantt.folder === 'function') {
+                    JSGantt.folder(originalId, chart);
+                  }
+                  if (dataObject && dataObject.wbsId) {
+                    selectTaskByWbsId(dataObject.wbsId);
+                  }
+                  setTimeout(() => {
+                    normalizeTaskTable(chart);
+                    makeTableEditable(chart);
+                    updateRowSelection();
+                  }, 0);
+                });
+                cell.appendChild(toggleBtn);
+              } else {
+                const spacer = document.createElement('span');
+                spacer.className = 'hierarchy-placeholder';
+                cell.appendChild(spacer);
+              }
+            } else {
+              let value = column.field ? dataObject[column.field] : '';
+              if (column.fallbackField && (value === undefined || value === null || value === '')) {
+                value = dataObject[column.fallbackField];
+              }
+              if (column.isDate) {
+                value = formatDateValue(value);
+              }
+              if (typeof column.formatter === 'function') {
+                try {
+                  value = column.formatter(value, dataObject);
+                } catch {
+                  // ignore formatter errors
+                }
+              }
+              if (value === undefined || value === null) {
+                value = '';
+              }
+              const asString = value.toString();
+              if (column.cls === 'gtaskname') {
+                const levelNumber = Number.parseInt(dataObject.level, 10);
+                const depth = Number.isNaN(levelNumber) ? 0 : Math.max(0, levelNumber - 1);
+                cell.textContent = asString;
+                cell.style.paddingLeft = depth > 0 ? depth * 16 + 'px' : '';
+              } else {
+                cell.textContent = asString;
+                if (column.cls !== 'gtaskname') {
+                  cell.style.removeProperty('padding-left');
+                }
+              }
+            }
+          }
+          applyWidth(cell, column.width);
+          return cell;
+        });
+
+          while (row.firstChild) {
+            row.removeChild(row.firstChild);
+          }
+          newCells.forEach(cell => row.appendChild(cell));
+        };
+
+        const headerRow = document.querySelector('.gtasktableh tbody tr:nth-child(2)');
+        if (headerRow) {
+          reorderRow(headerRow, true, null, null);
+        }
+
+        const spanningHeaderRow = document.querySelector('.gtasktableh tbody tr:first-child');
+        if (spanningHeaderRow) {
+          const spanningCell = spanningHeaderRow.querySelector('.gspanning');
+          if (spanningCell) {
+            const desiredColSpan = Math.max(1, TASK_TABLE_COLUMNS.length - 1);
+            if (spanningCell.colSpan !== desiredColSpan) {
+              spanningCell.colSpan = desiredColSpan;
+            }
+            spanningCell.innerHTML = '';
+            const addBtn = document.createElement('button');
+            addBtn.type = 'button';
+            addBtn.className = 'task-add-btn';
+            addBtn.textContent = 'add Task';
+            addBtn.addEventListener('click', event => {
+              event.preventDefault();
+              openAddTaskModal();
+            });
+            spanningCell.appendChild(addBtn);
+          }
+        }
+
+        chart.vTaskList.forEach(task => {
+          if (typeof task.getListChildRow !== 'function') return;
+          const row = task.getListChildRow();
+          if (!row) return;
+          const dataObject = typeof task.getDataObject === 'function' ? task.getDataObject() : null;
+          reorderRow(row, false, dataObject, task);
+          row.classList.add('task-row');
+          if (!row.hasAttribute('role')) {
+            row.setAttribute('role', 'row');
+          }
+          if (dataObject && dataObject.wbsId) {
+            row.dataset.wbsId = dataObject.wbsId;
+            row.tabIndex = 0;
+            row.onclick = event => {
+              if (
+                activeEditor &&
+                activeEditor.input &&
+                activeEditor.input.contains(event.target)
+              ) {
+                event.stopPropagation();
+                return;
+              }
+              selectTaskByWbsId(dataObject.wbsId);
+            };
+            row.onkeydown = event => {
+              if (
+                activeEditor &&
+                activeEditor.input &&
+                activeEditor.input.contains(event.target)
+              ) {
+                event.stopPropagation();
+                return;
+              }
+              const tag = event.target && event.target.tagName;
+              if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') {
+                event.stopPropagation();
+                return;
+              }
+              if (event.key === 'Enter' || event.key === ' ') {
+                event.preventDefault();
+                event.stopPropagation();
+                selectTaskByWbsId(dataObject.wbsId);
+              }
+            };
+          }
+        });
+
+        const footerRow = document.querySelector('.gtasktable tbody tr:last-child');
+        if (footerRow) {
+          reorderRow(footerRow, true);
+        }
+        updateRowSelection();
+      }
+
+      function resolveInlineErrorHost(target) {
+        if (!target) {
+          return null;
+        }
+        if (target.classList && target.classList.contains('detail-panel__value')) {
+          return target;
+        }
+        if (typeof target.closest === 'function') {
+          const detailValue = target.closest('.detail-panel__value');
+          if (detailValue) {
+            return detailValue;
+          }
+          const cell = target.closest('td');
+          if (cell) {
+            return cell;
+          }
+        }
+        return target;
+      }
+
+      function showInlineError(target, message) {
+        const host = resolveInlineErrorHost(target);
+        if (!host) {
+          return;
+        }
+        host.classList.add('has-inline-error');
+        if (host.dataset) {
+          host.dataset.inlineError = message || '입력값이 올바르지 않습니다.';
+        } else {
+          host.setAttribute('data-inline-error', message || '입력값이 올바르지 않습니다.');
+        }
+      }
+
+      function clearInlineError(target) {
+        const host = resolveInlineErrorHost(target);
+        if (!host) {
+          return;
+        }
+        host.classList.remove('has-inline-error');
+        if (host.dataset && Object.prototype.hasOwnProperty.call(host.dataset, 'inlineError')) {
+          delete host.dataset.inlineError;
+        } else {
+          host.removeAttribute('data-inline-error');
+        }
+      }
+
+      function resetDetailInputValue(control, editorConfig, recordValue, record) {
+        if (!control) {
+          return;
+        }
+        let nextValue;
+        if (editorConfig && typeof editorConfig.toInputValue === 'function') {
+          try {
+            nextValue = editorConfig.toInputValue(recordValue, record);
+          } catch {
+            nextValue = recordValue;
+          }
+        } else {
+          nextValue = recordValue;
+        }
+        if (
+          nextValue &&
+          typeof nextValue === 'object' &&
+          Object.prototype.hasOwnProperty.call(nextValue, 'value')
+        ) {
+          nextValue = nextValue.value;
+        }
+        if (nextValue === undefined || nextValue === null) {
+          control.value = '';
+        } else {
+          control.value = nextValue.toString();
+        }
+      }
+
+      function makeTableEditable(chart) {
+        const table = document.querySelector('.gtasktable');
+        if (!table) return;
+        if (table.dataset.editableBound === 'true') {
+          return;
+        }
+        table.dataset.editableBound = 'true';
+
+        function cancelActiveEditor() {
+          if (!activeEditor) {
+            return;
+          }
+          closeEditor(activeEditor, { revert: true });
+        }
+        if (typeof globalThis !== 'undefined') {
+          globalThis.__cancelTaskTableEditor = cancelActiveEditor;
+        }
+
+        function closeEditor(editor, options = {}) {
+          if (!editor) return;
+          const { cell, input, config, column } = editor;
+          const { revert = false, displayValue, preserveInlineError = false } = options;
+          input.removeEventListener('blur', editor.handleBlur);
+          input.removeEventListener('keydown', editor.handleKeydown);
+          if (editor.handleInput) {
+            input.removeEventListener('input', editor.handleInput);
+          }
+          if (config.element === 'select' && editor.handleChange) {
+            input.removeEventListener('change', editor.handleChange);
+          }
+          editor.isCommitting = false;
+          cell.classList.remove('is-editing');
+          cell.innerHTML = '';
+          if (!preserveInlineError) {
+            clearInlineError(cell);
+          }
+          const valueForDisplay = revert
+            ? editor.originalDisplay
+            : displayValue !== undefined
+            ? displayValue
+            : formatCellDisplay(column, editor.originalValue);
+          cell.textContent = valueForDisplay;
+          if (activeEditor === editor) {
+            activeEditor = null;
+          }
+        }
+
+        function commitEdit(editor) {
+          if (!editor || activeEditor !== editor) {
+            return;
+          }
+          if (editor.isCommitting) {
+            return;
+          }
+          editor.isCommitting = true;
+          const { input, config, record, wbsId, column, cell } = editor;
+          let parsedValue;
+          try {
+            parsedValue = config.parse(
+              config.element === 'select' ? input.value : input.value,
+              { record, wbsId }
+            );
+          } catch (error) {
+            showInlineError(cell, error.message || '입력값이 올바르지 않습니다.');
+            editor.isCommitting = false;
+            closeEditor(editor, { revert: true, preserveInlineError: true });
+            setTimeout(() => {
+              beginEdit(cell);
+            }, 0);
+            return;
+          }
+
+          const currentValue = record ? record[config.field] : undefined;
+          if (valuesEqual(currentValue, parsedValue, config)) {
+            closeEditor(editor, { displayValue: formatCellDisplay(column, currentValue) });
+            editor.isCommitting = false;
+            return;
+          }
+
+          let applyResult;
+          try {
+            applyResult = applyCellValue({
+              wbsId,
+              field: config.field,
+              value: parsedValue,
+              record
+            });
+          } catch (error) {
+            showInlineError(cell, error.message || '작업을 업데이트하지 못했습니다.');
+            editor.isCommitting = false;
+            closeEditor(editor, { revert: true, preserveInlineError: true });
+            setTimeout(() => {
+              beginEdit(cell);
+            }, 0);
+            return;
+          }
+
+          clearInlineError(cell);
+          closeEditor(editor, { displayValue: formatCellDisplay(column, parsedValue) });
+          editor.isCommitting = false;
+          if (selectedTaskWbsId === wbsId) {
+            selectTaskByWbsId(wbsId, { suppressFocus: true });
+          }
+          if (applyResult && applyResult.taskUpdated) {
+            refreshChartSurface();
+          } else {
+            renderChart(currentRows);
+          }
+          if (applyResult) {
+            queueFieldAutoSave({
+              wbsId,
+              field: config.field,
+              value: record ? record[config.field] : parsedValue,
+              previousValue: applyResult.previousValue,
+              record
+            });
+          }
+        }
+
+        function beginEdit(cell) {
+          if (!cell || cell.classList.contains('gtaskid') || cell.classList.contains('gtasklist')) {
+            return;
+          }
+          if (cell.classList.contains('is-editing')) {
+            return;
+          }
+          const columnClass = EDITABLE_CLASS_NAMES.find(cls => cell.classList.contains(cls));
+          if (!columnClass) {
+            return;
+          }
+          const config = EDITABLE_COLUMN_CONFIG[columnClass];
+          if (!config) {
+            return;
+          }
+          const column = TASK_COLUMN_BY_CLASS[columnClass];
+          if (!column || !column.field) {
+            return;
+          }
+          const row = cell.closest('tr');
+          if (!row) {
+            return;
+          }
+          const wbsIdCell = row.querySelector('.gtaskid');
+          if (!wbsIdCell) {
+            return;
+          }
+          const wbsId = wbsIdCell.textContent.trim();
+          if (!wbsId) {
+            return;
+          }
+          const record = currentRowLookup.get(wbsId) || null;
+          const cellText = cell.textContent.trim();
+
+          if (typeof config.canEdit === 'function') {
+            const canEdit = config.canEdit({
+              record,
+              wbsId,
+              column,
+              cell,
+              cellText
+            });
+            if (!canEdit) {
+              if (config.blockedMessage) {
+                showInlineError(cell, config.blockedMessage);
+                setTimeout(() => clearInlineError(cell), 2400);
+              }
+              return;
+            }
+          }
+
+          if (activeEditor && activeEditor.cell === cell) {
+            return;
+          }
+          cancelActiveEditor();
+
+          const context = {
+            record,
+            column,
+            cellText,
+            wbsId
+          };
+          const initialRecordValue = record ? record[config.field] : undefined;
+          const rawInitialValue =
+            typeof config.toInputValue === 'function'
+              ? config.toInputValue(initialRecordValue, context)
+              : initialRecordValue !== undefined
+              ? initialRecordValue
+              : context.cellText;
+          let placeholderLabel = null;
+          let initialValue = rawInitialValue;
+          if (
+            rawInitialValue &&
+            typeof rawInitialValue === 'object' &&
+            Object.prototype.hasOwnProperty.call(rawInitialValue, 'value')
+          ) {
+            placeholderLabel =
+              typeof rawInitialValue.placeholder === 'string'
+                ? rawInitialValue.placeholder
+                : null;
+            initialValue = rawInitialValue.value;
+          }
+
+          let input;
+          if (config.element === 'select') {
+            input = document.createElement('select');
+            if (placeholderLabel) {
+              const placeholderOption = document.createElement('option');
+              placeholderOption.value = '';
+              placeholderOption.textContent = placeholderLabel;
+              placeholderOption.disabled = true;
+              placeholderOption.selected = true;
+              input.appendChild(placeholderOption);
+            }
+            config.options.forEach(optionValue => {
+              const optionEl = document.createElement('option');
+              optionEl.value = optionValue;
+              optionEl.textContent = optionValue;
+              input.appendChild(optionEl);
+            });
+          } else {
+            input = document.createElement('input');
+            input.type = config.inputType || 'text';
+          }
+          if (config.attributes) {
+            Object.entries(config.attributes).forEach(([key, value]) => {
+              if (value !== undefined && value !== null) {
+                input.setAttribute(key, value);
+              }
+            });
+          }
+
+          if (config.element === 'select') {
+            if (initialValue) {
+              input.value = initialValue;
+            } else if (!placeholderLabel && config.options.length) {
+              input.value = config.options[0];
+            }
+          } else if (initialValue !== undefined && initialValue !== null) {
+            input.value = initialValue.toString();
+          } else {
+            input.value = '';
+          }
+
+          if (config.inputType === 'date') {
+            input.style.width = '80px';
+            input.style.minWidth = '80px';
+            input.style.maxWidth = '80px';
+            input.style.fontSize = '12px';
+          }
+
+          if (config.element === 'select') {
+            input.style.width = '50px';
+            input.style.minWidth = '50px';
+            input.style.maxWidth = '50px';
+            input.style.fontSize = '12px';
+          }
+
+          if (config.field === 'weight') {
+            const availableWidth = cell.clientWidth || column.width || 50;
+            const targetWidth = Math.max(availableWidth - 6, 24);
+            input.style.width = targetWidth + 'px';
+            input.style.maxWidth = '100%';
+            input.style.minWidth = '0';
+            input.style.boxSizing = 'border-box';
+          }
+
+          const editor = {
+            cell,
+            input,
+            config,
+            column,
+            wbsId,
+            record,
+            originalDisplay: cell.textContent,
+            originalValue: initialRecordValue,
+            handleBlur: null,
+            handleKeydown: null,
+            handleChange: null,
+            handleInput: null,
+            isCommitting: false
+          };
+
+          editor.handleBlur = () => {
+            commitEdit(editor);
+          };
+          editor.handleKeydown = event => {
+            event.stopPropagation();
+            if (event.key === 'Enter') {
+              event.preventDefault();
+              commitEdit(editor);
+            } else if (event.key === 'Escape') {
+              event.preventDefault();
+              closeEditor(editor, { revert: true });
+            }
+          };
+          if (config.element === 'select') {
+            editor.handleChange = () => {
+              commitEdit(editor);
+            };
+            input.addEventListener('change', editor.handleChange);
+          }
+          input.addEventListener('blur', editor.handleBlur);
+          input.addEventListener('keydown', editor.handleKeydown);
+          editor.handleInput = () => {
+            clearInlineError(cell);
+          };
+          input.addEventListener('input', editor.handleInput);
+
+          cell.classList.add('is-editing');
+          cell.innerHTML = '';
+          cell.appendChild(input);
+          activeEditor = editor;
+
+          setTimeout(() => {
+            input.focus();
+            if (config.element !== 'select' && typeof input.select === 'function') {
+              input.select();
+            }
+          }, 0);
+        }
+
+        table.addEventListener('dblclick', event => {
+          if (
+            activeEditor &&
+            activeEditor.input &&
+            activeEditor.input.contains(event.target)
+          ) {
+            return;
+          }
+          const cell = event.target.closest('td');
+          if (!cell || !table.contains(cell)) {
+            return;
+          }
+          event.preventDefault();
+          event.stopPropagation();
+          beginEdit(cell);
+        });
+      }
+
+      function formatGanttDateHeaders(chart) {
+        if (!target || !chart) {
+          return;
+        }
+        const headerTable = target.querySelector('.gcharttableh');
+        if (!headerTable) {
+          return;
+        }
+        const headerRows = headerTable.querySelectorAll('tr');
+        if (headerRows.length < 2) {
+          return;
+        }
+        const majorRow = headerRows[0];
+        const minorRow = headerRows[1];
+        const minorCells = Array.from(minorRow.querySelectorAll('td'));
+        if (!minorCells.length) {
+          return;
+        }
+        const timelineStart = (() => {
+          if (typeof chart.getMinDate === 'function') {
+            const explicit = chart.getMinDate();
+            if (explicit instanceof Date) {
+              return new Date(explicit.getTime());
+            }
+          }
+          if (typeof JSGantt !== 'undefined' && typeof JSGantt.getMinDate === 'function') {
+            const computed = JSGantt.getMinDate(
+              chart.vTaskList || [],
+              chart.vFormat || 'day',
+              null
+            );
+            if (computed instanceof Date) {
+              return new Date(computed.getTime());
+            }
+          }
+          return null;
+        })();
+        if (!(timelineStart instanceof Date)) {
+          return;
+        }
+
+        const formatMinorCell = (cell, date) => {
+          const inner = cell.querySelector('div');
+          if (inner) {
+            inner.textContent = date.getDate();
+          } else {
+            cell.textContent = date.getDate();
+          }
+        };
+        const calculateGroupWidth = (cells, startIndex, length) => {
+          let total = 0;
+          for (let i = 0; i < length; i += 1) {
+            const cell = cells[startIndex + i];
+            if (!cell) continue;
+            if (typeof cell.getBoundingClientRect === 'function') {
+              total += cell.getBoundingClientRect().width;
+            } else if (typeof cell.offsetWidth === 'number') {
+              total += cell.offsetWidth;
+            }
+          }
+          return total;
+        };
+        const appendMonthCell = (row, span, label, width) => {
+          if (!row || span <= 0) {
+            return;
+          }
+          const cell = document.createElement('td');
+          cell.className = 'gmajorheading custom-month-heading';
+          cell.colSpan = span;
+          const div = document.createElement('div');
+          div.textContent = label;
+          if (width > 0 && Number.isFinite(width)) {
+            div.style.width = width + 'px';
+          }
+          cell.appendChild(div);
+          row.appendChild(cell);
+        };
+
+        majorRow.innerHTML = '';
+        let currentMonthKey = null;
+        let currentMonthStartIndex = 0;
+        let currentMonthLabel = '';
+
+        minorCells.forEach((cell, index) => {
+          const cellDate = addDays(timelineStart, index);
+          if (!(cellDate instanceof Date)) {
+            return;
+          }
+          formatMinorCell(cell, cellDate);
+          const monthKey = cellDate.getFullYear() + '-' + cellDate.getMonth();
+          if (currentMonthKey === null) {
+            currentMonthKey = monthKey;
+            currentMonthStartIndex = index;
+            currentMonthLabel = formatMonthLabel(cellDate);
+            return;
+          }
+          if (monthKey !== currentMonthKey) {
+            const spanLength = index - currentMonthStartIndex;
+            const monthWidth = calculateGroupWidth(minorCells, currentMonthStartIndex, spanLength);
+            appendMonthCell(majorRow, spanLength, currentMonthLabel, monthWidth);
+            currentMonthKey = monthKey;
+            currentMonthStartIndex = index;
+            currentMonthLabel = formatMonthLabel(cellDate);
+          }
+        });
+        const finalSpanLength = minorCells.length - currentMonthStartIndex;
+        if (finalSpanLength > 0) {
+          const monthWidth = calculateGroupWidth(
+            minorCells,
+            currentMonthStartIndex,
+            finalSpanLength
+          );
+          const monthDate = addDays(timelineStart, currentMonthStartIndex);
+          appendMonthCell(majorRow, finalSpanLength, formatMonthLabel(monthDate), monthWidth);
+        }
+      }
+
+      function applyCellValue({ wbsId, field, value, record }) {
+        if (!wbsId || !field) {
+          throw new Error('업데이트할 작업을 찾지 못했습니다.');
+        }
+        let targetRecord = record || currentRowLookup.get(wbsId) || null;
+        if (!targetRecord) {
+          const index = currentRows.findIndex(row => row.wbsId === wbsId);
+          if (index === -1) {
+            throw new Error('업데이트할 작업을 찾지 못했습니다.');
+          }
+          targetRecord = currentRows[index];
+        }
+        const previousValue = targetRecord[field];
+        targetRecord[field] = value;
+        if (field === 'startDate' || field === 'endDate') {
+          const startMs = toUtcMidnight(targetRecord.startDate);
+          const endMs = toUtcMidnight(targetRecord.endDate);
+          if (startMs !== null && endMs !== null && startMs > endMs) {
+            targetRecord[field] = previousValue;
+            throw new Error('Start Date는 End Date보다 늦을 수 없습니다.');
+          }
+          updateRecordPlanned(targetRecord);
+        }
+        if (field === 'progress') {
+          targetRecord.progressDisplay = Number.isFinite(targetRecord.progress)
+            ? targetRecord.progress + '%'
+            : '';
+        }
+        if (field === 'status') {
+          targetRecord.status = normalizeStatusValue(targetRecord.status);
+        }
+        if (field === 'priority') {
+          targetRecord.priority = normalizePriorityValue(targetRecord.priority);
+        }
+        if (field === 'level') {
+          targetRecord.taskCssClass = getTaskClassName(targetRecord);
+        }
+        currentRowLookup.set(wbsId, targetRecord);
+        if (field === 'weight' || field === 'progress' || field === 'startDate' || field === 'endDate') {
+          updateValidationState(currentRows);
+        } else {
+          updateRecordValidation(targetRecord);
+        }
+        const taskUpdated = syncTaskItemWithRecord(targetRecord, field);
+        return { previousValue, taskUpdated };
+      }
+
+      function syncTaskItemWithRecord(record, changedField) {
+        if (
+          !record ||
+          !record.wbsId ||
+          !ganttChart ||
+          !Array.isArray(ganttChart.vTaskList) ||
+          !ganttChart.vTaskList.length
+        ) {
+          return false;
+        }
+        const taskItem = ganttChart.vTaskList.find(item => {
+          if (!item || typeof item.getDataObject !== 'function') {
+            return false;
+          }
+          const data = item.getDataObject();
+          return data && data.wbsId === record.wbsId;
+        });
+        if (!taskItem) {
+          return false;
+        }
+        if (typeof taskItem.setDataObject === 'function') {
+          taskItem.setDataObject(record);
+        }
+        const field = changedField;
+        if (field === 'taskName' && typeof taskItem.setName === 'function') {
+          taskItem.setName(record.taskName || record.wbsId);
+        }
+        if (field === 'startDate' || field === 'endDate') {
+          if (typeof taskItem.setStart === 'function') {
+            taskItem.setStart(toGanttStartOfDay(record.startDate));
+          }
+          if (typeof taskItem.setEnd === 'function') {
+            taskItem.setEnd(toGanttInclusiveEnd(record.endDate));
+          }
+        }
+        if (field === 'progress') {
+          const numeric = Number.isFinite(record.progress) ? record.progress : 0;
+          const captionValue = Number.isFinite(record.progress) ? record.progress + '%' : '';
+          record.progressDisplay = captionValue;
+          if (typeof taskItem.setComp === 'function') {
+            taskItem.setComp(numeric);
+          }
+          if (typeof taskItem.setCompVal === 'function') {
+            taskItem.setCompVal(numeric);
+          }
+        }
+        if (field === 'level' && typeof taskItem.setClass === 'function') {
+          const newClassName = getTaskClassName(record);
+          record.taskCssClass = newClassName;
+          taskItem.setClass(newClassName);
+          if (typeof taskItem.setPlanClass === 'function') {
+            taskItem.setPlanClass(newClassName);
+          }
+        }
+        if (field === 'owner' && typeof taskItem.setResource === 'function') {
+          taskItem.setResource(record.owner || '');
+        }
+        if (field === 'weight' && typeof taskItem.setWeight === 'function') {
+          const weightValue = Number(record.weight);
+          if (!Number.isNaN(weightValue)) {
+            taskItem.setWeight(weightValue);
+          }
+        }
+        return true;
+      }
+
+      function refreshChartSurface() {
+        if (!ganttChart) {
+          return;
+        }
+        updateAllPlanned(currentRows);
+        ganttChart.Draw();
+        if (typeof ganttChart.DrawDependencies === 'function') {
+          ganttChart.DrawDependencies();
+        }
+        normalizeTaskTable(ganttChart);
+        makeTableEditable(ganttChart);
+        if (selectedTaskWbsId) {
+          selectTaskByWbsId(selectedTaskWbsId, { suppressFocus: true });
+        } else {
+          updateRowSelection();
+        }
+        applyValidationState(currentValidationState);
+      }
+
+      function formatCellDisplay(column, value) {
+        if (value === undefined || value === null) {
+          return '';
+        }
+        if (column && typeof column.formatter === 'function') {
+          try {
+            return column.formatter(value);
+          } catch {
+            return value.toString();
+          }
+        }
+        return value.toString();
+      }
+
+      function valuesEqual(previous, next, config) {
+        if (config && typeof config.compare === 'function') {
+          return config.compare(previous, next);
+        }
+        return previous === next;
+      }
+
+    })();
+  </script>
+</body>
+</html>

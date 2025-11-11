@@ -1,0 +1,39 @@
+{
+  "updatedAt": "2025-11-11T00:48:13.332Z",
+  "sessions": [
+    {
+      "id": "chat_mhturcic0bzng5",
+      "title": "새 대화",
+      "createdAt": "2025-11-11T00:48:13.331Z",
+      "updatedAt": "2025-11-11T00:48:13.331Z",
+      "messages": []
+    },
+    {
+      "id": "chat_mhta6xit43aidp",
+      "title": "새 주제",
+      "createdAt": "2025-11-10T15:12:28.468Z",
+      "updatedAt": "2025-11-10T15:12:28.468Z",
+      "messages": []
+    },
+    {
+      "id": "chat_mht9udjrgg7k1q",
+      "title": "대화 시작",
+      "createdAt": "2025-11-10T15:02:42.711Z",
+      "updatedAt": "2025-11-10T15:03:02.278Z",
+      "messages": [
+        {
+          "id": "msg_mht9usn9w27nvd",
+          "role": "user",
+          "content": "너는 누구니?",
+          "createdAt": "2025-11-10T15:03:02.277Z"
+        },
+        {
+          "id": "msg_mht9usn9dxrp1h",
+          "role": "assistant",
+          "content": "준비중입니다.",
+          "createdAt": "2025-11-10T15:03:02.278Z"
+        }
+      ]
+    }
+  ]
+}

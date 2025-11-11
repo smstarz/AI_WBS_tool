@@ -1,0 +1,5 @@
+﻿wbs id,task name,level,parent id,start date,end date,duration,progress,planned,owner,cost estimate,priority,weight,status,deliverable,acceptance criteria,review date
+F001,테스트 작업,1,,2025-11-04,2025-11-13,9,82,67,잌쿤,0,Medium,60,지연,,,
+F001-01,테스트 하위작업,2,F001,2025-11-04,2025-11-12,3,85,100,잌쿤,0,Medium,25,지연,,,
+F002,테스트 작업2,1,,2025-11-18,2025-11-20,3,15,0,잌쿤,0,Medium,40,대기중,,,
+F001-02,테스트 하위작업2,2,F001,2025-11-07,2025-11-13,7,80,57,잌쿤,0,Medium,35,지연,,,
