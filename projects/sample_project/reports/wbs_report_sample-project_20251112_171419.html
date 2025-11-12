@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WBS 진행 상황 리포트 - sample_project</title>
+    <style>
+      :root {
+        color-scheme: light;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+        margin: 0;
+        background: #f3f4f8;
+        color: #0f172a;
+        display: flex;
+        justify-content: center;
+        padding: 40px 0;
+      }
+      .report-shell {
+        width: 800px;
+        margin: 0 auto;
+        background: #ffffff;
+        border-radius: 16px;
+        box-shadow: 0 30px 60px rgba(15, 23, 42, 0.12);
+        padding: 32px 36px;
+      }
+      .report-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 40px;
+        border-bottom: 1px solid #e5e7eb;
+        padding-bottom: 24px;
+        margin-bottom: 32px;
+      }
+      .report-title {
+        margin: 0;
+        font-size: 18px;
+        line-height: 24px;
+      }
+      .report-meta {
+        margin: 6px 0 0;
+        color: #6b7280;
+        font-size: 11px;
+      }
+      .report-download {
+        border: none;
+        border-radius: 999px;
+        background: #4d7cff;
+        color: #fff;
+        width: 120px;
+        height: 24px;
+        font-size: 10px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+      .report-download:hover {
+        background: #3b66d6;
+      }
+      .metric-section + .metric-section {
+        margin-top: 32px;
+      }
+      .section-header {
+        margin-bottom: 16px;
+      }
+      .section-header h2 {
+        margin: 0 0 6px;
+        font-size: 16px;
+      }
+      .section-header p {
+        margin: 0;
+        color: #6b7280;
+        font-size: 10px;
+      }
+      .metric-grid {
+        display: grid;
+        grid-template-columns: 1fr;
+        gap: 20px;
+        justify-content: center;
+      }
+      .metric-grid--two {
+        grid-template-columns: 340px 340px;
+      }
+      .metric-grid--three {
+        grid-template-columns: 228px 228px 228px;
+      }
+      .metric-card {
+        border: 1px solid #dfe5fb;
+        border-radius: 14px;
+        padding: 24px;
+        background: #fbfcff;
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+      }
+      .chart-block {
+        width: 100%;
+        min-height: 160px;
+        padding: 4px 0;
+      }
+      .chart-block canvas {
+        width: 100% !important;
+        height: 160px !important;
+      }
+      .metric-card h3 {
+        margin: 0;
+        font-size: 15px;
+        color: #111827;
+      }
+      .stat-pair {
+        display: flex;
+        gap: 32px;
+        flex-wrap: nowrap;
+        align-items: flex-start;
+      }
+      .stat-label {
+        margin: 0;
+        font-size: 11px;
+        color: #6b7280;
+        text-transform: uppercase;
+        letter-spacing: 0;
+        font-family: inherit;
+      }
+      .stat-value {
+        margin: 6px 0 0;
+        font-size: 28px;
+        font-weight: 600;
+        font-family: inherit;
+      }
+      .stat-value--compact {
+        font-size: 20px;
+      }
+      .stat-triple {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 8px;
+      }
+      .stat-triple > div {
+        flex: 1;
+      }
+      .stat-helper {
+        margin: 4px 0 0;
+        color: #6b7280;
+        font-size: 12px;
+      }
+      .stat-helper--compact {
+        margin-top: 2px;
+      }
+      .progress-track {
+        width: 100%;
+        height: 12px;
+        border-radius: 6px;
+        background: #e2e6ff;
+        overflow: hidden;
+      }
+      .metric-list--progress .progress-track {
+        margin-top: 8px;
+      }
+      .progress-track--thin {
+        height: 8px;
+      }
+      .progress-thumb {
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg, #4d7cff, #61d5ff);
+      }
+      .progress-thumb--secondary {
+        background: #94a3f3;
+      }
+      .spi-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 2px;
+        margin-bottom: 4px;
+      }
+      .spi-header .stat-value {
+        margin: 0;
+        font-size: 18px;
+        order: 1;
+      }
+      .spi-header .status-badge {
+        order: 2;
+      }
+      .spi-progress {
+        width: 100%;
+        height: 8px;
+        border-radius: 999px;
+        background: #e2e6ff;
+        overflow: hidden;
+        margin-top: 0;
+      }
+      .spi-progress__thumb {
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg, #ec4899, #fbbf24, #4d7cff);
+      }
+      .status-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        padding: 2px 14px;
+        border-radius: 16px;
+        font-size: 12px;
+        font-weight: 600;
+      }
+      .status-badge--ahead {
+        color: #0f5132;
+        background: #d1fae5;
+      }
+      .status-badge--delay {
+        color: #b42318;
+        background: #fee2e2;
+      }
+      .status-badge--ontrack {
+        color: #1d4ed8;
+        background: #dbeafe;
+      }
+      .status-badge--muted {
+        color: #6b7280;
+        background: #f3f4f6;
+      }
+      .metric-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .metric-list--progress {
+        gap: 20px;
+      }
+      .metric-empty {
+        margin: 0;
+        color: #94a3b8;
+        font-size: 13px;
+      }
+      .metric-list--deliverable {
+        gap: 10px;
+      }
+      .deliverable-row {
+        font-size: 12px;
+        color: #0f172a;
+        padding: 6px 8px;
+        border-radius: 10px;
+        background: #f8fafc;
+      }
+      .list-row__meta {
+        display: flex;
+        justify-content: space-between;
+        gap: 8px;
+        font-size: 14px;
+        font-weight: 600;
+        color: #0f172a;
+      }
+      .metric-list--progress .list-row__title {
+        font-size: 11px;
+      }
+      .metric-list--progress .list-row__value {
+        font-size: 10px;
+      }
+      .list-row__value {
+        color: #4d7cff;
+      }
+      .risk-row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 4px 0;
+      }
+      .risk-row__header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .risk-row__wbs {
+        font-size: 10px;
+        font-weight: 600;
+        color: #4d7cff;
+        background: #edf1ff;
+        padding: 2px 6px;
+        border-radius: 999px;
+      }
+      .risk-row__name {
+        font-size: 12px;
+        font-weight: 600;
+        color: #0f172a;
+      }
+      .risk-row__chip {
+        font-size: 11px;
+        color: #b45309;
+        background: #fff7ed;
+        padding: 2px 8px;
+        border-radius: 999px;
+      }
+      .risk-row__stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        font-size: 11px;
+        color: #6b7280;
+      }
+      .risk-row__stats div {
+        min-width: 120px;
+      }
+      .risk-row__stats span {
+        font-size: 10px;
+        text-transform: uppercase;
+        color: #9ca3af;
+      }
+      .risk-row__stats strong {
+        display: block;
+        font-size: 14px;
+        color: #0f172a;
+        margin-top: 2px;
+      }
+      .risk-row__deliverable {
+        margin: 0;
+        font-size: 11px;
+        color: #4b5563;
+      }
+      .risk-row__deliverable span {
+        font-weight: 600;
+        margin-right: 4px;
+      }
+      .list-row__sub {
+        margin: 6px 0 0;
+        color: #6b7280;
+        font-size: 12px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="report-shell">
+      <header class="report-header">
+        <div>
+          <h1 class="report-title">WBS 진행 상황 리포트</h1>
+          <p class="report-meta">sample_project · 생성 2025. 11. 12. 오후 05:14:19</p>
+        </div>
+        <button class="report-download" data-report-download="wbs_report_sample-project_20251112_171419.html">HTML 다운로드</button>
+      </header>
+
+      <section class="metric-section">
+        <div class="section-header">
+          <h2>진척률 관련 지표</h2>
+          <p>현재 프로젝트의 실제/예정 대비 상태를 요약합니다.</p>
+        </div>
+        <div class="metric-grid metric-grid--three">
+          <article class="metric-card">
+            <h3>전체 WBS 평균 Progress</h3>
+            <p class="stat-helper stat-helper--compact">예정보다 53.3%p 느립니다.</p>
+            <div class="chart-block" aria-hidden="true">
+              <canvas id="progressChart"></canvas>
+            </div>
+          </article>
+
+          <article class="metric-card">
+            <h3>상위 레벨 Progress</h3>
+            <ul class="metric-list metric-list--progress">
+              <li>
+            <div class="list-row__meta">
+              <span class="list-row__title">디자인</span>
+              <span class="list-row__value">21.0% / 29.0%</span>
+            </div>
+            <div class="progress-track progress-track--thin" aria-hidden="true">
+              <span class="progress-thumb" style="width: 21%;"></span>
+            </div>
+          </li><li>
+            <div class="list-row__meta">
+              <span class="list-row__title">백엔드(API &amp; DB)</span>
+              <span class="list-row__value">20.0% / —</span>
+            </div>
+            <div class="progress-track progress-track--thin" aria-hidden="true">
+              <span class="progress-thumb" style="width: 20%;"></span>
+            </div>
+          </li><li>
+            <div class="list-row__meta">
+              <span class="list-row__title">프론트엔드(모바일 앱)</span>
+              <span class="list-row__value">17.0% / —</span>
+            </div>
+            <div class="progress-track progress-track--thin" aria-hidden="true">
+              <span class="progress-thumb" style="width: 17%;"></span>
+            </div>
+          </li><li>
+            <div class="list-row__meta">
+              <span class="list-row__title">배포/운영</span>
+              <span class="list-row__value">0.0% / —</span>
+            </div>
+            <div class="progress-track progress-track--thin" aria-hidden="true">
+              <span class="progress-thumb" style="width: 0%;"></span>
+            </div>
+          </li>
+            </ul>
+          </article>
+
+          <article class="metric-card">
+            <h3>기한 대비 진행률 (SPI)</h3>
+            <p class="stat-helper stat-helper--compact">계획 대비 완료 속도가 느립니다.</p>
+            <div class="spi-header">
+              <span class="status-badge status-badge--delay">Delay</span>
+              <p class="stat-value">18.2%</p>
+            </div>
+            <div class="spi-progress" aria-hidden="true">
+              <span class="spi-progress__thumb" style="width: 18.181818181818183%;"></span>
+            </div>
+            <div class="stat-triple">
+              <div>
+                <p class="stat-label">완료</p>
+                <p class="stat-value stat-value--compact">2</p>
+              </div>
+              <div>
+                <p class="stat-label">계획</p>
+                <p class="stat-value stat-value--compact">11</p>
+              </div>
+              <div>
+                <p class="stat-label">지연</p>
+                <p class="stat-value stat-value--compact">14</p>
+              </div>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <section class="metric-section">
+        <div class="section-header">
+          <h2>앞으로 일정 위험 Task</h2>
+          <p>마감이 임박했지만 진행률이 낮은 작업을 우선 확인하세요.(최대 5개까지 표출됩니다)</p>
+        </div>
+        <article class="metric-card">
+          <ul class="metric-list">
+            <li class="risk-row">
+            <div class="risk-row__header">
+              <span class="risk-row__wbs">#D01-02-01-02</span>
+              <span class="risk-row__name">상세/콘텐츠 화면설계</span>
+              <span class="risk-row__chip">1일 남음</span>
+            </div>
+            <div class="risk-row__stats">
+              <div>
+                <span>Planned</span>
+                <strong>67.0%</strong>
+              </div>
+              <div>
+                <span>Progress</span>
+                <strong>30.0%</strong>
+              </div>
+              <div>
+                <span>Owner</span>
+                <strong>TBD</strong>
+              </div>
+              <div>
+                <span>마감일</span>
+                <strong>2025-11-12</strong>
+              </div>
+            </div>
+            <p class="risk-row__deliverable"><span>Deliverable</span>상세/콘텐츠 화면설계 결과물</p>
+          </li><li class="risk-row">
+            <div class="risk-row__header">
+              <span class="risk-row__wbs">#D01-02-01</span>
+              <span class="risk-row__name">핵심 화면 와이어프레임</span>
+              <span class="risk-row__chip">1일 남음</span>
+            </div>
+            <div class="risk-row__stats">
+              <div>
+                <span>Planned</span>
+                <strong>80.0%</strong>
+              </div>
+              <div>
+                <span>Progress</span>
+                <strong>40.0%</strong>
+              </div>
+              <div>
+                <span>Owner</span>
+                <strong>TBD</strong>
+              </div>
+              <div>
+                <span>마감일</span>
+                <strong>2025-11-12</strong>
+              </div>
+            </div>
+            <p class="risk-row__deliverable"><span>Deliverable</span>핵심 화면 와이어프레임 결과물</p>
+          </li><li class="risk-row">
+            <div class="risk-row__header">
+              <span class="risk-row__wbs">#D01-02</span>
+              <span class="risk-row__name">와이어프레임 제작</span>
+              <span class="risk-row__chip">5일 남음</span>
+            </div>
+            <div class="risk-row__stats">
+              <div>
+                <span>Planned</span>
+                <strong>44.0%</strong>
+              </div>
+              <div>
+                <span>Progress</span>
+                <strong>24.0%</strong>
+              </div>
+              <div>
+                <span>Owner</span>
+                <strong>TBD</strong>
+              </div>
+              <div>
+                <span>마감일</span>
+                <strong>2025-11-16</strong>
+              </div>
+            </div>
+            <p class="risk-row__deliverable"><span>Deliverable</span>와이어프레임 제작 결과물</p>
+          </li>
+          </ul>
+        </article>
+      </section>
+
+      <section class="metric-section">
+        <div class="section-header">
+          <h2>리소스 지표</h2>
+          <p>오너별 작업량 분포와 Planned 대비 Progress를 제공합니다.</p>
+        </div>
+        <div class="metric-grid metric-grid--two">
+          <article class="metric-card">
+            <h3>오너별 작업량 분포</h3>
+            <div class="chart-block">
+              <canvas id="ownerChart"></canvas>
+            </div>
+          </article>
+          <article class="metric-card">
+            <h3>오너별 Progress</h3>
+            <ul class="metric-list metric-list--progress">
+              <li>
+            <div class="list-row__meta">
+              <span class="list-row__title">TBD</span>
+              <span class="list-row__value">35.6% / 88.0%</span>
+            </div>
+            <div class="progress-track progress-track--thin" aria-hidden="true">
+              <span class="progress-thumb" style="width: 35.57831325301205%;"></span>
+            </div>
+          </li><li>
+            <div class="list-row__meta">
+              <span class="list-row__title">Ciel</span>
+              <span class="list-row__value">10.3% / —</span>
+            </div>
+            <div class="progress-track progress-track--thin" aria-hidden="true">
+              <span class="progress-thumb" style="width: 10.333333333333334%;"></span>
+            </div>
+          </li>
+            </ul>
+          </article>
+        </div>
+      </section>
+
+      <section class="metric-section">
+        <div class="section-header">
+          <h2>산출물 리스트</h2>
+          <p>완료된 작업의 Deliverable을 마감일 기준으로 확인합니다.</p>
+        </div>
+        <article class="metric-card">
+          <h3>완료된 산출물</h3>
+          <ul class="metric-list metric-list--deliverable">
+            <li class="deliverable-row">#D01-01-01-01 · 기존 레퍼런스 앱 조사 · 기존 레퍼런스 앱 조사 결과물 · 2025-11-03</li><li class="deliverable-row">#F01-01-01-01 · React Native/Flutter 초기화 · React Native/Flutter 초기화 결과물 · 2025-11-12</li>
+          </ul>
+        </article>
+      </section>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script id="reportChartPayload" type="application/json">{"progress":{"labels":["Actual","Planned"],"values":[34.69767441860465,88]},"owner":{"labels":["TBD","Ciel"],"values":[98.05999999999999,1.9399999999999986]}}</script>
+    <script>
+      (function () {
+        function initCharts() {
+          if (!window.Chart) {
+            console.warn('Chart.js is not available.');
+            return;
+          }
+          const progressValuePlugin = {
+            id: 'progressValuePlugin',
+            afterDatasetsDraw(chart) {
+              if (chart.config.type !== 'bar') {
+                return;
+              }
+              const { ctx } = chart;
+              ctx.save();
+              ctx.font = '600 12px "Pretendard",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+              ctx.fillStyle = '#0f172a';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+              chart.getDatasetMeta(0).data.forEach((bar, index) => {
+                const value = chart.data.datasets[0].data[index];
+                if (typeof value !== 'number') {
+                  return;
+                }
+                const label = value.toFixed(1) + '%';
+                ctx.fillText(label, bar.x, bar.y - 4);
+              });
+              ctx.restore();
+            }
+          };
+          Chart.register(progressValuePlugin);
+          const payloadNode = document.getElementById('reportChartPayload');
+          if (!payloadNode) {
+            return;
+          }
+          let payload = null;
+          try {
+            payload = JSON.parse(payloadNode.textContent || '{}');
+          } catch (error) {
+            console.warn('Failed to parse chart payload', error);
+            return;
+          }
+          const progressCtx = document.getElementById('progressChart');
+          if (progressCtx && payload.progress) {
+            new Chart(progressCtx, {
+              type: 'bar',
+              data: {
+                labels: payload.progress.labels,
+                datasets: [
+                  {
+                    data: payload.progress.values,
+                    backgroundColor: ['#4d7cff', '#b1c2ff'],
+                    borderRadius: 8,
+                    maxBarThickness: 48
+                  }
+                ]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    callbacks: {
+                      label(context) {
+                        return context.parsed + '%';
+                      }
+                    }
+                  }
+                },
+                scales: {
+                  x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 11 } }
+                  },
+                  y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: { stepSize: 25, font: { size: 10 } }
+                  }
+                }
+              }
+            });
+          }
+          const ownerCtx = document.getElementById('ownerChart');
+          if (ownerCtx && payload.owner && payload.owner.labels.length) {
+            new Chart(ownerCtx, {
+              type: 'doughnut',
+              data: {
+                labels: payload.owner.labels,
+                datasets: [
+                  {
+                    data: payload.owner.values,
+                    backgroundColor: ['#4d7cff', '#61d5ff', '#94a3f3', '#fbbf24', '#f472b6', '#34d399'],
+                    borderWidth: 0
+                  }
+                ]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',
+                plugins: {
+                  legend: {
+                    position: 'bottom',
+                    labels: {
+                      boxWidth: 12,
+                      font: { size: 10 },
+                      generateLabels(chart) {
+                        const data = chart.data;
+                        if (!data.labels.length) {
+                          return [];
+                        }
+                        return data.labels.map((label, index) => {
+                          const value = data.datasets[0].data[index];
+                          return {
+                            text: label + ' ' + value.toFixed(1) + '%',
+                            fillStyle: data.datasets[0].backgroundColor[index],
+                            strokeStyle: data.datasets[0].backgroundColor[index],
+                            lineWidth: 0,
+                            index
+                          };
+                        });
+                      }
+                    }
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label(context) {
+                        const label = context.label || '';
+                        const value = typeof context.parsed === 'number' ? context.parsed.toFixed(1) : context.parsed;
+                        return label + ': ' + value + '%';
+                      }
+                    }
+                  }
+                }
+              }
+            });
+          }
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initCharts);
+        } else {
+          initCharts();
+        }
+      })();
+    </script>
+    <script>
+      (function () {
+        const button = document.querySelector('[data-report-download]');
+        if (!button) {
+          return;
+        }
+        const fileName = button.getAttribute('data-report-download') || 'wbs_report.html';
+        button.addEventListener('click', () => {
+          const serializer = '<!DOCTYPE html>' + document.documentElement.outerHTML;
+          const blob = new Blob([serializer], { type: 'text/html;charset=utf-8' });
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+        });
+      })();
+    </script>
+  </body>
+</html>

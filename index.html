@@ -1014,6 +1014,8 @@
     import { initChatbot } from './js/chatbot.js';
     import { generateReportHtml, buildReportFilename } from './js/reportGenerator.js';
 
+    const REPORT_WINDOW_FEATURES = 'width=900,height=960,scrollbars=yes,resizable=yes';
+
     (function initGantt() {
       const TASK_TABLE_COLUMNS = [
         { cls: 'gtasklist', label: '\u00A0', width: 28 },
@@ -2273,6 +2275,23 @@
         return payload || { fileName };
       }
 
+      function openReportWindow(targetUrl = '') {
+        try {
+          const popup = window.open(targetUrl, '_blank', REPORT_WINDOW_FEATURES);
+          if (popup) {
+            try {
+              popup.opener = null;
+            } catch (error) {
+              console.warn('Unable to clear report window opener', error);
+            }
+          }
+          return popup;
+        } catch (error) {
+          console.warn('Failed to open report window', error);
+          return null;
+        }
+      }
+
       async function handleReportGeneration() {
         if (isGeneratingReport) {
           return;
@@ -2293,23 +2312,14 @@
           generatedAt,
           fileName
         });
-        let previewWindow = null;
-        try {
-          previewWindow = window.open('', '_blank');
-          if (previewWindow) {
-            try {
-              previewWindow.opener = null;
-            } catch (error) {
-              console.warn('Unable to clear preview opener', error);
-            }
-            previewWindow.document.write(
-              "<p style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 1.5rem;\">리포트를 준비하고 있습니다…</p>"
-            );
-            previewWindow.document.close();
-          }
-        } catch (error) {
-          console.warn('Failed to open preview window', error);
-          previewWindow = null;
+        const previewWindow = openReportWindow('');
+        if (previewWindow) {
+          previewWindow.document.write(
+            "<p style=\"font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; padding: 1.5rem;\">리포트를 준비하고 있습니다…</p>"
+          );
+          previewWindow.document.close();
+        } else {
+          setStatus('팝업 창을 열 수 없습니다. 브라우저 팝업 차단을 해제해주세요.', 'warning');
         }
         isGeneratingReport = true;
         updateToolbarState();
@@ -2325,23 +2335,23 @@
             ? new URL(targetUrl, window.location.origin).href
             : '';
           if (previewWindow && absoluteUrl) {
-            previewWindow.location.href = absoluteUrl;
+            previewWindow.location.replace(absoluteUrl);
           } else if (previewWindow) {
             previewWindow.document.open();
             previewWindow.document.write(html);
             previewWindow.document.close();
           } else if (absoluteUrl) {
-            window.open(absoluteUrl, '_blank', 'noopener');
+            const directWindow = openReportWindow(absoluteUrl);
+            if (!directWindow) {
+              setStatus('팝업이 차단되어 리포트 창을 열지 못했습니다. 브라우저 설정을 확인해주세요.', 'warning');
+            }
           } else {
-            const fallbackWindow = window.open('', '_blank');
+            const fallbackWindow = openReportWindow('');
             if (fallbackWindow) {
-              try {
-                fallbackWindow.opener = null;
-              } catch (error) {
-                console.warn('Unable to clear fallback opener', error);
-              }
               fallbackWindow.document.write(html);
               fallbackWindow.document.close();
+            } else {
+              setStatus('팝업 차단 때문에 새 창을 열지 못했습니다. 브라우저 팝업을 허용해주세요.', 'warning');
             }
           }
           const savedFile =

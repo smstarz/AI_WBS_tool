@@ -191,6 +191,7 @@ function computeReportInsights(rows = [], generatedAt = new Date()) {
   const plannedValues = [];
   const levelProgress = [];
   const ownerMap = new Map();
+  const ownerProgressMap = new Map();
   let ownerWeightTotal = 0;
   let delayedCount = 0;
   let actualCompleteCount = 0;
@@ -198,6 +199,7 @@ function computeReportInsights(rows = [], generatedAt = new Date()) {
   let reviewOverdue = 0;
   let reviewTotal = 0;
   let reviewCompleted = 0;
+  const completedDeliverables = [];
   let completedWeightValue = 0;
   let totalWeightValue = 0;
   const riskCandidates = [];
@@ -216,20 +218,39 @@ function computeReportInsights(rows = [], generatedAt = new Date()) {
     if (Number.isFinite(levelValue) && levelValue === 1) {
       levelProgress.push({
         name: normalizeString(row.taskName || row['task name'] || row.wbsId || row['wbs id'] || '레벨 1 작업'),
-        progress: progress !== null ? progress : 0
+        progress: progress !== null ? progress : 0,
+        planned: planned !== null ? planned : null
       });
-    }
-
-    if (isTaskComplete(row)) {
-      actualCompleteCount += 1;
     }
 
     const owner = normalizeString(row.owner || row.Owner) || '미지정';
     const weight = getWeight(row);
     ownerWeightTotal += weight;
     ownerMap.set(owner, (ownerMap.get(owner) || 0) + weight);
+    let ownerProgressEntry = ownerProgressMap.get(owner);
+    if (!ownerProgressEntry) {
+      ownerProgressEntry = { progressValues: [], plannedValues: [] };
+      ownerProgressMap.set(owner, ownerProgressEntry);
+    }
+    if (progress !== null) {
+      ownerProgressEntry.progressValues.push(progress);
+    }
+    if (planned !== null) {
+      ownerProgressEntry.plannedValues.push(planned);
+    }
 
     const endDate = parseDate(row.endDate || row['end date']);
+    if (isTaskComplete(row)) {
+      actualCompleteCount += 1;
+      if (endDate) {
+        completedDeliverables.push({
+          name: normalizeString(row.taskName || row['task name'] || row.wbsId || '작업'),
+          wbsId: normalizeString(row.wbsId || row['wbs id']),
+          deliverable: normalizeString(row.deliverable || row.Deliverable),
+          endDate: endDate.toISOString().slice(0, 10)
+        });
+      }
+    }
     if (endDate && endDate.getTime() <= today.getTime()) {
       plannedCompleteCount += 1;
     } else if (planned !== null && planned >= 100) {
@@ -243,12 +264,19 @@ function computeReportInsights(rows = [], generatedAt = new Date()) {
     if (endDate) {
       const daysLeft = Math.ceil((endDate.getTime() - today.getTime()) / MS_PER_DAY);
       const currentProgress = progress !== null ? progress : 0;
-      if (daysLeft >= 0 && daysLeft <= RISK_WINDOW_DAYS && currentProgress < LOW_PROGRESS_THRESHOLD) {
+      if (
+        daysLeft >= 0 &&
+        daysLeft <= RISK_WINDOW_DAYS &&
+        planned !== null &&
+        currentProgress < planned
+      ) {
         riskCandidates.push({
           name: normalizeString(row.taskName || row['task name'] || row.wbsId || '작업'),
           owner,
           daysLeft,
           progress: currentProgress,
+          planned: planned !== null ? planned : null,
+          deliverable: normalizeString(row.deliverable || row.Deliverable),
           endDate: endDate.toISOString().slice(0, 10),
           wbsId: normalizeString(row.wbsId || row['wbs id'])
         });
@@ -284,12 +312,28 @@ function computeReportInsights(rows = [], generatedAt = new Date()) {
     }))
     .sort((a, b) => b.weight - a.weight);
 
+  const ownerProgress = ownerDistribution.map(entry => {
+    const progressEntry = ownerProgressMap.get(entry.owner) || { progressValues: [], plannedValues: [] };
+    return {
+      owner: entry.owner,
+      progress: average(progressEntry.progressValues),
+      planned: average(progressEntry.plannedValues)
+    };
+  });
+
   const spiRatio = plannedCompleteCount > 0 ? actualCompleteCount / plannedCompleteCount : null;
   const spiStatus = describeSpiStatus(spiRatio);
 
   const riskTasks = riskCandidates
     .sort((a, b) => a.daysLeft - b.daysLeft || a.progress - b.progress)
     .slice(0, 5);
+
+  completedDeliverables.sort((a, b) => {
+    if (a.endDate === b.endDate) {
+      return a.name.localeCompare(b.name);
+    }
+    return a.endDate.localeCompare(b.endDate);
+  });
 
   return {
     totalTasks,
@@ -314,12 +358,14 @@ function computeReportInsights(rows = [], generatedAt = new Date()) {
       totalReviewable: reviewTotal,
       completionRate: reviewTotal ? reviewCompleted / reviewTotal : null
     },
+    completedDeliverables,
     budget: {
       completedValue: completedWeightValue,
       totalValue: totalWeightValue,
       completionRatio: totalWeightValue ? completedWeightValue / totalWeightValue : null
     },
-    ownerDistribution
+    ownerDistribution,
+    ownerProgress
   };
 }
 
@@ -356,14 +402,16 @@ export function generateReportHtml({
   const levelProgressMarkup = insights.levelProgress.length
     ? insights.levelProgress
         .map(item => {
-          const value = clampPercent(item.progress);
+          const actualValue = clampPercent(item.progress);
+          const displayActual = formatPercent(item.progress);
+          const displayPlanned = Number.isFinite(item.planned) ? formatPercent(item.planned) : '—';
           return `<li>
             <div class="list-row__meta">
               <span class="list-row__title">${escapeHtml(item.name || '레벨 1')}</span>
-              <span class="list-row__value">${formatPercent(item.progress)}</span>
+              <span class="list-row__value">${displayActual} / ${displayPlanned}</span>
             </div>
             <div class="progress-track progress-track--thin" aria-hidden="true">
-              <span class="progress-thumb" style="width: ${value}%;"></span>
+              <span class="progress-thumb" style="width: ${actualValue}%;"></span>
             </div>
           </li>`;
         })
@@ -373,32 +421,85 @@ export function generateReportHtml({
   const riskTasksMarkup = insights.riskTasks.length
     ? insights.riskTasks
         .map(task => {
-          return `<li>
-            <div class="list-row__meta">
-              <span class="list-row__title">${escapeHtml(task.name)}</span>
-              <span class="list-row__value">${task.daysLeft}일 남음 · ${formatPercent(task.progress)}</span>
+          const plannedText = Number.isFinite(task.planned) ? formatPercent(task.planned) : '—';
+          const deliverableText = task.deliverable ? escapeHtml(task.deliverable) : '미정';
+          const wbsText = task.wbsId ? '#' + escapeHtml(task.wbsId) : '#—';
+          return `<li class="risk-row">
+            <div class="risk-row__header">
+              <span class="risk-row__wbs">${wbsText}</span>
+              <span class="risk-row__name">${escapeHtml(task.name)}</span>
+              <span class="risk-row__chip">${task.daysLeft}일 남음</span>
             </div>
-            <p class="list-row__sub">${escapeHtml(task.owner)} · 마감 ${escapeHtml(task.endDate)} (${escapeHtml(task.wbsId || '')})</p>
+            <div class="risk-row__stats">
+              <div>
+                <span>Planned</span>
+                <strong>${plannedText}</strong>
+              </div>
+              <div>
+                <span>Progress</span>
+                <strong>${formatPercent(task.progress)}</strong>
+              </div>
+              <div>
+                <span>Owner</span>
+                <strong>${escapeHtml(task.owner)}</strong>
+              </div>
+              <div>
+                <span>마감일</span>
+                <strong>${escapeHtml(task.endDate)}</strong>
+              </div>
+            </div>
+            <p class="risk-row__deliverable"><span>Deliverable</span>${deliverableText}</p>
           </li>`;
         })
         .join('')
     : '<li class="metric-empty">예상 지연 조건에 해당하는 작업이 없습니다.</li>';
 
-  const ownerDistributionMarkup = insights.ownerDistribution.length
-    ? insights.ownerDistribution
+  const ownerProgressMarkup = insights.ownerProgress.length
+    ? insights.ownerProgress
         .map(item => {
+          const actualValue = clampPercent(item.progress ?? 0);
+          const displayActual = formatPercent(item.progress);
+          const displayPlanned = Number.isFinite(item.planned) ? formatPercent(item.planned) : '—';
           return `<li>
             <div class="list-row__meta">
               <span class="list-row__title">${escapeHtml(item.owner)}</span>
-              <span class="list-row__value">${formatPercent(item.percent)}</span>
+              <span class="list-row__value">${displayActual} / ${displayPlanned}</span>
             </div>
             <div class="progress-track progress-track--thin" aria-hidden="true">
-              <span class="progress-thumb progress-thumb--secondary" style="width: ${clampPercent(item.percent)}%;"></span>
+              <span class="progress-thumb" style="width: ${actualValue}%;"></span>
             </div>
           </li>`;
         })
         .join('')
-    : '<li class="metric-empty">오너 정보가 포함된 작업이 없습니다.</li>';
+    : '<li class="metric-empty">오너별 진행률을 계산할 데이터가 없습니다.</li>';
+
+  const deliverableListMarkup = insights.completedDeliverables.length
+    ? insights.completedDeliverables
+        .map(item => {
+          const label = [
+            item.wbsId ? '#' + escapeHtml(item.wbsId) : '#—',
+            escapeHtml(item.name),
+            item.deliverable ? escapeHtml(item.deliverable) : 'Deliverable 미정',
+            escapeHtml(item.endDate || '')
+          ].join(' · ');
+          return `<li class="deliverable-row">${label}</li>`;
+        })
+        .join('')
+    : '<li class="metric-empty">완료된 산출물이 없습니다.</li>';
+
+  const chartPayload = {
+    progress: {
+      labels: ['Actual', 'Planned'],
+      values: [
+        clampPercent(insights.averages.progress || 0),
+        clampPercent(insights.averages.planned || 0)
+      ]
+    },
+    owner: {
+      labels: insights.ownerDistribution.map(item => item.owner || '미지정'),
+      values: insights.ownerDistribution.map(item => clampPercent(item.percent))
+    }
+  };
 
   return `<!DOCTYPE html>
 <html lang="ko">
@@ -416,44 +517,48 @@ export function generateReportHtml({
       body {
         font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
         margin: 0;
-        padding: 2rem;
-        background: #f5f6fa;
+        background: #f3f4f8;
         color: #0f172a;
+        display: flex;
+        justify-content: center;
+        padding: 40px 0;
       }
       .report-shell {
-        max-width: 1100px;
+        width: 800px;
         margin: 0 auto;
         background: #ffffff;
-        border-radius: 20px;
+        border-radius: 16px;
         box-shadow: 0 30px 60px rgba(15, 23, 42, 0.12);
-        padding: 2.5rem;
+        padding: 32px 36px;
       }
       .report-header {
         display: flex;
-        flex-wrap: wrap;
-        gap: 1rem;
         justify-content: space-between;
         align-items: flex-start;
+        gap: 40px;
         border-bottom: 1px solid #e5e7eb;
-        padding-bottom: 1.25rem;
-        margin-bottom: 2rem;
+        padding-bottom: 24px;
+        margin-bottom: 32px;
       }
       .report-title {
         margin: 0;
-        font-size: 2rem;
+        font-size: 18px;
+        line-height: 24px;
       }
       .report-meta {
-        margin: 0.3rem 0 0;
+        margin: 6px 0 0;
         color: #6b7280;
-        font-size: 0.95rem;
+        font-size: 11px;
       }
       .report-download {
         border: none;
         border-radius: 999px;
         background: #4d7cff;
         color: #fff;
-        padding: 0.6rem 1.4rem;
-        font-size: 0.9rem;
+        width: 120px;
+        height: 24px;
+        font-size: 10px;
+        font-weight: 600;
         cursor: pointer;
         transition: background 0.2s ease;
       }
@@ -461,75 +566,107 @@ export function generateReportHtml({
         background: #3b66d6;
       }
       .metric-section + .metric-section {
-        margin-top: 2rem;
+        margin-top: 32px;
       }
       .section-header {
-        margin-bottom: 1rem;
+        margin-bottom: 16px;
       }
       .section-header h2 {
-        margin: 0 0 0.3rem;
-        font-size: 1.2rem;
+        margin: 0 0 6px;
+        font-size: 16px;
       }
       .section-header p {
         margin: 0;
         color: #6b7280;
-        font-size: 0.9rem;
+        font-size: 10px;
       }
       .metric-grid {
         display: grid;
-        gap: 1rem;
+        grid-template-columns: 1fr;
+        gap: 20px;
+        justify-content: center;
       }
       .metric-grid--two {
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        grid-template-columns: 340px 340px;
       }
       .metric-grid--three {
-        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+        grid-template-columns: 228px 228px 228px;
       }
       .metric-card {
-        border: 1px solid #eef2ff;
-        border-radius: 16px;
-        padding: 1.5rem;
-        background: #fdfdff;
+        border: 1px solid #dfe5fb;
+        border-radius: 14px;
+        padding: 24px;
+        background: #fbfcff;
         display: flex;
         flex-direction: column;
-        gap: 1rem;
+        gap: 16px;
+      }
+      .chart-block {
+        width: 100%;
+        min-height: 160px;
+        padding: 4px 0;
+      }
+      .chart-block canvas {
+        width: 100% !important;
+        height: 160px !important;
       }
       .metric-card h3 {
         margin: 0;
-        font-size: 1rem;
+        font-size: 15px;
         color: #111827;
       }
       .stat-pair {
         display: flex;
-        gap: 1.5rem;
-        flex-wrap: wrap;
+        gap: 32px;
+        flex-wrap: nowrap;
+        align-items: flex-start;
       }
       .stat-label {
         margin: 0;
-        font-size: 0.75rem;
+        font-size: 11px;
         color: #6b7280;
         text-transform: uppercase;
-        letter-spacing: 0.08em;
+        letter-spacing: 0;
+        font-family: inherit;
       }
       .stat-value {
-        margin: 0.15rem 0 0;
-        font-size: 1.8rem;
+        margin: 6px 0 0;
+        font-size: 28px;
         font-weight: 600;
+        font-family: inherit;
+      }
+      .stat-value--compact {
+        font-size: 20px;
+      }
+      .stat-triple {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 8px;
+      }
+      .stat-triple > div {
+        flex: 1;
       }
       .stat-helper {
-        margin: 0;
+        margin: 4px 0 0;
         color: #6b7280;
-        font-size: 0.9rem;
+        font-size: 12px;
+      }
+      .stat-helper--compact {
+        margin-top: 2px;
       }
       .progress-track {
         width: 100%;
-        height: 10px;
-        border-radius: 999px;
-        background: #e5e9ff;
+        height: 12px;
+        border-radius: 6px;
+        background: #e2e6ff;
         overflow: hidden;
       }
+      .metric-list--progress .progress-track {
+        margin-top: 8px;
+      }
       .progress-track--thin {
-        height: 6px;
+        height: 8px;
       }
       .progress-thumb {
         display: block;
@@ -539,13 +676,42 @@ export function generateReportHtml({
       .progress-thumb--secondary {
         background: #94a3f3;
       }
+      .spi-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-top: 2px;
+        margin-bottom: 4px;
+      }
+      .spi-header .stat-value {
+        margin: 0;
+        font-size: 18px;
+        order: 1;
+      }
+      .spi-header .status-badge {
+        order: 2;
+      }
+      .spi-progress {
+        width: 100%;
+        height: 8px;
+        border-radius: 999px;
+        background: #e2e6ff;
+        overflow: hidden;
+        margin-top: 0;
+      }
+      .spi-progress__thumb {
+        display: block;
+        height: 100%;
+        background: linear-gradient(90deg, #ec4899, #fbbf24, #4d7cff);
+      }
       .status-badge {
         display: inline-flex;
         align-items: center;
-        gap: 0.25rem;
-        padding: 0.15rem 0.75rem;
-        border-radius: 999px;
-        font-size: 0.8rem;
+        gap: 4px;
+        padding: 2px 14px;
+        border-radius: 16px;
+        font-size: 12px;
         font-weight: 600;
       }
       .status-badge--ahead {
@@ -570,36 +736,109 @@ export function generateReportHtml({
         padding: 0;
         display: flex;
         flex-direction: column;
-        gap: 0.75rem;
+        gap: 12px;
+      }
+      .metric-list--progress {
+        gap: 20px;
       }
       .metric-empty {
         margin: 0;
         color: #94a3b8;
-        font-size: 0.9rem;
+        font-size: 13px;
+      }
+      .metric-list--deliverable {
+        gap: 10px;
+      }
+      .deliverable-row {
+        font-size: 12px;
+        color: #0f172a;
+        padding: 6px 8px;
+        border-radius: 10px;
+        background: #f8fafc;
       }
       .list-row__meta {
         display: flex;
         justify-content: space-between;
-        gap: 0.5rem;
-        font-size: 0.9rem;
+        gap: 8px;
+        font-size: 14px;
         font-weight: 600;
         color: #0f172a;
+      }
+      .metric-list--progress .list-row__title {
+        font-size: 11px;
+      }
+      .metric-list--progress .list-row__value {
+        font-size: 10px;
       }
       .list-row__value {
         color: #4d7cff;
       }
-      .list-row__sub {
-        margin: 0.2rem 0 0;
-        color: #6b7280;
-        font-size: 0.85rem;
+      .risk-row {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        padding: 4px 0;
       }
-      @media (max-width: 640px) {
-        body {
-          padding: 1rem;
-        }
-        .report-shell {
-          padding: 1.5rem;
-        }
+      .risk-row__header {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        align-items: center;
+      }
+      .risk-row__wbs {
+        font-size: 10px;
+        font-weight: 600;
+        color: #4d7cff;
+        background: #edf1ff;
+        padding: 2px 6px;
+        border-radius: 999px;
+      }
+      .risk-row__name {
+        font-size: 12px;
+        font-weight: 600;
+        color: #0f172a;
+      }
+      .risk-row__chip {
+        font-size: 11px;
+        color: #b45309;
+        background: #fff7ed;
+        padding: 2px 8px;
+        border-radius: 999px;
+      }
+      .risk-row__stats {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 12px;
+        font-size: 11px;
+        color: #6b7280;
+      }
+      .risk-row__stats div {
+        min-width: 120px;
+      }
+      .risk-row__stats span {
+        font-size: 10px;
+        text-transform: uppercase;
+        color: #9ca3af;
+      }
+      .risk-row__stats strong {
+        display: block;
+        font-size: 14px;
+        color: #0f172a;
+        margin-top: 2px;
+      }
+      .risk-row__deliverable {
+        margin: 0;
+        font-size: 11px;
+        color: #4b5563;
+      }
+      .risk-row__deliverable span {
+        font-weight: 600;
+        margin-right: 4px;
+      }
+      .list-row__sub {
+        margin: 6px 0 0;
+        color: #6b7280;
+        font-size: 12px;
       }
     </style>
   </head>
@@ -621,49 +860,42 @@ export function generateReportHtml({
         <div class="metric-grid metric-grid--three">
           <article class="metric-card">
             <h3>전체 WBS 평균 Progress</h3>
-            <div class="stat-pair">
-              <div>
-                <p class="stat-label">Actual</p>
-                <p class="stat-value">${formatPercent(insights.averages.progress)}</p>
-              </div>
-              <div>
-                <p class="stat-label">Planned</p>
-                <p class="stat-value">${formatPercent(insights.averages.planned)}</p>
-              </div>
+            <p class="stat-helper stat-helper--compact">${escapeHtml(progressComparisonText)}</p>
+            <div class="chart-block" aria-hidden="true">
+              <canvas id="progressChart"></canvas>
             </div>
-            <div class="progress-track" aria-hidden="true">
-              <span class="progress-thumb" style="width: ${clampPercent(insights.averages.progress || 0)}%;"></span>
-            </div>
-            <p class="stat-helper">${escapeHtml(progressComparisonText)}</p>
           </article>
 
           <article class="metric-card">
             <h3>상위 레벨 Progress</h3>
-            <ul class="metric-list">
+            <ul class="metric-list metric-list--progress">
               ${levelProgressMarkup}
             </ul>
           </article>
 
           <article class="metric-card">
             <h3>기한 대비 진행률 (SPI)</h3>
-            <div>
+            <p class="stat-helper stat-helper--compact">${escapeHtml(insights.schedule.status.helper)}</p>
+            <div class="spi-header">
               <span class="status-badge ${insights.schedule.status.className}">${insights.schedule.status.label}</span>
-              <p class="stat-value" style="margin-top: 0.5rem;">${Number.isFinite(insights.schedule.ratio) ? insights.schedule.ratio.toFixed(2) : '—'}</p>
-              <p class="stat-helper">${escapeHtml(insights.schedule.status.helper)}</p>
+              <p class="stat-value">${Number.isFinite(insights.schedule.ratio) ? (insights.schedule.ratio * 100).toFixed(1) + '%' : '—'}</p>
             </div>
-            <div class="stat-pair" style="margin-top: 0.5rem;">
+            <div class="spi-progress" aria-hidden="true">
+              <span class="spi-progress__thumb" style="width: ${clampPercent((insights.schedule.ratio || 0) * 100)}%;"></span>
+            </div>
+            <div class="stat-triple">
               <div>
-                <p class="stat-label">완료 작업</p>
-                <p class="stat-value">${formatInteger(insights.schedule.actualCompleteCount)}</p>
+                <p class="stat-label">완료</p>
+                <p class="stat-value stat-value--compact">${formatInteger(insights.schedule.actualCompleteCount)}</p>
               </div>
               <div>
-                <p class="stat-label">계획 완료 기준</p>
-                <p class="stat-value">${formatInteger(insights.schedule.plannedCompleteCount)}</p>
+                <p class="stat-label">계획</p>
+                <p class="stat-value stat-value--compact">${formatInteger(insights.schedule.plannedCompleteCount)}</p>
               </div>
-            </div>
-            <div>
-              <p class="stat-label" style="margin-top: 0.5rem;">지연 Task</p>
-              <p class="stat-value" style="font-size: 1.4rem;">${formatInteger(insights.delayed.count)} (${formatPercent(insights.delayed.ratio)})</p>
+              <div>
+                <p class="stat-label">지연</p>
+                <p class="stat-value stat-value--compact">${formatInteger(insights.delayed.count)}</p>
+              </div>
             </div>
           </article>
         </div>
@@ -672,7 +904,7 @@ export function generateReportHtml({
       <section class="metric-section">
         <div class="section-header">
           <h2>앞으로 일정 위험 Task</h2>
-          <p>마감이 임박했지만 진행률이 낮은 작업을 우선 확인하세요.</p>
+          <p>마감이 임박했지만 진행률이 낮은 작업을 우선 확인하세요.(최대 5개까지 표출됩니다)</p>
         </div>
         <article class="metric-card">
           <ul class="metric-list">
@@ -683,48 +915,188 @@ export function generateReportHtml({
 
       <section class="metric-section">
         <div class="section-header">
-          <h2>산출물 검수 지표</h2>
-          <p>검토 일정과 완료 현황을 통해 품질 리스크를 파악합니다.</p>
+          <h2>리소스 지표</h2>
+          <p>오너별 작업량 분포와 Planned 대비 Progress를 제공합니다.</p>
         </div>
         <div class="metric-grid metric-grid--two">
           <article class="metric-card">
-            <h3>Review Due 대비 Overdue</h3>
-            <p class="stat-value">${formatInteger(insights.review.overdueCount)}</p>
-            <p class="stat-helper">기한이 지난 리뷰 대기 작업 수</p>
+            <h3>오너별 작업량 분포</h3>
+            <div class="chart-block">
+              <canvas id="ownerChart"></canvas>
+            </div>
           </article>
           <article class="metric-card">
-            <h3>검토 완료율</h3>
-            <p class="stat-value">${formatFractionAsPercent(insights.review.completionRate)}</p>
-            <p class="stat-helper">${formatInteger(insights.review.totalReviewable)}건 중 완료된 리뷰 비율</p>
+            <h3>오너별 Progress</h3>
+            <ul class="metric-list metric-list--progress">
+              ${ownerProgressMarkup}
+            </ul>
           </article>
         </div>
       </section>
 
       <section class="metric-section">
         <div class="section-header">
-          <h2>예산 / 리소스 지표</h2>
-          <p>단순화된 EVA 및 오너별 작업량 분포를 제공합니다.</p>
+          <h2>산출물 리스트</h2>
+          <p>완료된 작업의 Deliverable을 마감일 기준으로 확인합니다.</p>
         </div>
-        <div class="metric-grid metric-grid--two">
-          <article class="metric-card">
-            <h3>Earned Value (Weight × Cost)</h3>
-            <p class="stat-label">완료 가치</p>
-            <p class="stat-value">${formatCurrency(insights.budget.completedValue)}</p>
-            <div class="progress-track" aria-hidden="true">
-              <span class="progress-thumb" style="width: ${clampPercent((insights.budget.completionRatio || 0) * 100)}%;"></span>
-            </div>
-            <p class="stat-helper">총 계획 대비 ${formatFractionAsPercent(insights.budget.completionRatio)} 달성</p>
-          </article>
-          <article class="metric-card">
-            <h3>오너별 작업량 분포</h3>
-            <ul class="metric-list">
-              ${ownerDistributionMarkup}
-            </ul>
-          </article>
-        </div>
+        <article class="metric-card">
+          <h3>완료된 산출물</h3>
+          <ul class="metric-list metric-list--deliverable">
+            ${deliverableListMarkup}
+          </ul>
+        </article>
       </section>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script id="reportChartPayload" type="application/json">${JSON.stringify(chartPayload).replace(/</g, '\\u003c')}</script>
+    <script>
+      (function () {
+        function initCharts() {
+          if (!window.Chart) {
+            console.warn('Chart.js is not available.');
+            return;
+          }
+          const progressValuePlugin = {
+            id: 'progressValuePlugin',
+            afterDatasetsDraw(chart) {
+              if (chart.config.type !== 'bar') {
+                return;
+              }
+              const { ctx } = chart;
+              ctx.save();
+              ctx.font = '600 12px "Pretendard",-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif';
+              ctx.fillStyle = '#0f172a';
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'bottom';
+              chart.getDatasetMeta(0).data.forEach((bar, index) => {
+                const value = chart.data.datasets[0].data[index];
+                if (typeof value !== 'number') {
+                  return;
+                }
+                const label = value.toFixed(1) + '%';
+                ctx.fillText(label, bar.x, bar.y - 4);
+              });
+              ctx.restore();
+            }
+          };
+          Chart.register(progressValuePlugin);
+          const payloadNode = document.getElementById('reportChartPayload');
+          if (!payloadNode) {
+            return;
+          }
+          let payload = null;
+          try {
+            payload = JSON.parse(payloadNode.textContent || '{}');
+          } catch (error) {
+            console.warn('Failed to parse chart payload', error);
+            return;
+          }
+          const progressCtx = document.getElementById('progressChart');
+          if (progressCtx && payload.progress) {
+            new Chart(progressCtx, {
+              type: 'bar',
+              data: {
+                labels: payload.progress.labels,
+                datasets: [
+                  {
+                    data: payload.progress.values,
+                    backgroundColor: ['#4d7cff', '#b1c2ff'],
+                    borderRadius: 8,
+                    maxBarThickness: 48
+                  }
+                ]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                  legend: { display: false },
+                  tooltip: {
+                    callbacks: {
+                      label(context) {
+                        return context.parsed + '%';
+                      }
+                    }
+                  }
+                },
+                scales: {
+                  x: {
+                    grid: { display: false },
+                    ticks: { font: { size: 11 } }
+                  },
+                  y: {
+                    beginAtZero: true,
+                    max: 100,
+                    ticks: { stepSize: 25, font: { size: 10 } }
+                  }
+                }
+              }
+            });
+          }
+          const ownerCtx = document.getElementById('ownerChart');
+          if (ownerCtx && payload.owner && payload.owner.labels.length) {
+            new Chart(ownerCtx, {
+              type: 'doughnut',
+              data: {
+                labels: payload.owner.labels,
+                datasets: [
+                  {
+                    data: payload.owner.values,
+                    backgroundColor: ['#4d7cff', '#61d5ff', '#94a3f3', '#fbbf24', '#f472b6', '#34d399'],
+                    borderWidth: 0
+                  }
+                ]
+              },
+              options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                cutout: '65%',
+                plugins: {
+                  legend: {
+                    position: 'bottom',
+                    labels: {
+                      boxWidth: 12,
+                      font: { size: 10 },
+                      generateLabels(chart) {
+                        const data = chart.data;
+                        if (!data.labels.length) {
+                          return [];
+                        }
+                        return data.labels.map((label, index) => {
+                          const value = data.datasets[0].data[index];
+                          return {
+                            text: label + ' ' + value.toFixed(1) + '%',
+                            fillStyle: data.datasets[0].backgroundColor[index],
+                            strokeStyle: data.datasets[0].backgroundColor[index],
+                            lineWidth: 0,
+                            index
+                          };
+                        });
+                      }
+                    }
+                  },
+                  tooltip: {
+                    callbacks: {
+                      label(context) {
+                        const label = context.label || '';
+                        const value = typeof context.parsed === 'number' ? context.parsed.toFixed(1) : context.parsed;
+                        return label + ': ' + value + '%';
+                      }
+                    }
+                  }
+                }
+              }
+            });
+          }
+        }
+        if (document.readyState === 'loading') {
+          document.addEventListener('DOMContentLoaded', initCharts);
+        } else {
+          initCharts();
+        }
+      })();
+    </script>
     <script>
       (function () {
         const button = document.querySelector('[data-report-download]');
