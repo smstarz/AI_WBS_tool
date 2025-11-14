@@ -1,6 +1,13 @@
+require('dotenv').config();
+
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
+const { createChatCompletion, isConfigured } = require('./lib/llm');
+const {
+  CHAT_TOOL_DEFINITIONS,
+  executeLoadProjectData
+} = require('./lib/chatTools');
 
 const PORT = Number(process.env.PORT) || 5173;
 const HOST = process.env.HOST || '0.0.0.0';
@@ -55,6 +62,22 @@ const FIELD_DEFS_BY_KEY = FIELD_DEFS.reduce((acc, field) => {
   acc[field.key] = field;
   return acc;
 }, Object.create(null));
+
+const STATUS_OPTIONS = ['작업중', '대기중', '완료', '지연', '보류', '취소'];
+const STATUS_DEFAULT = '대기중';
+const STATUS_VALUE_ALIASES = {
+  '': STATUS_DEFAULT,
+  none: STATUS_DEFAULT,
+  'no status': STATUS_DEFAULT,
+  'no-status': STATUS_DEFAULT,
+  'not started': STATUS_DEFAULT,
+  notstarted: STATUS_DEFAULT,
+  'not-started': STATUS_DEFAULT,
+  '상태 없음': STATUS_DEFAULT,
+  상태없음: STATUS_DEFAULT,
+  '—': STATUS_DEFAULT,
+  '-': STATUS_DEFAULT
+};
 
 function getFieldNames(field) {
   if (!field) return [];
@@ -235,6 +258,73 @@ function truncateText(value, maxLength = 80) {
   return value.slice(0, Math.max(0, maxLength - 3)) + '...';
 }
 
+function normalizeStatusValue(value) {
+  if (value === undefined || value === null) {
+    return STATUS_DEFAULT;
+  }
+  const stringValue = value.toString().trim();
+  if (!stringValue) {
+    return STATUS_DEFAULT;
+  }
+  if (STATUS_OPTIONS.includes(stringValue)) {
+    return stringValue;
+  }
+  const lower = stringValue.toLowerCase();
+  if (Object.prototype.hasOwnProperty.call(STATUS_VALUE_ALIASES, lower)) {
+    return STATUS_VALUE_ALIASES[lower];
+  }
+  if (Object.prototype.hasOwnProperty.call(STATUS_VALUE_ALIASES, stringValue)) {
+    return STATUS_VALUE_ALIASES[stringValue];
+  }
+  return stringValue;
+}
+
+function toFiniteNumber(value) {
+  if (Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.replace(/%/g, '').trim();
+    if (!trimmed) {
+      return 0;
+    }
+    const numeric = Number(trimmed);
+    return Number.isFinite(numeric) ? numeric : 0;
+  }
+  if (value === null || value === undefined || value === '') {
+    return 0;
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function deriveStatusFromProgress(progress, planned) {
+  if (progress === null || progress === undefined || progress === '') {
+    return null;
+  }
+  const numericProgress = Number(progress);
+  if (!Number.isFinite(numericProgress)) {
+    return null;
+  }
+  if (numericProgress >= 100) {
+    return '완료';
+  }
+  const plannedNumeric = toFiniteNumber(planned);
+  if (plannedNumeric > 0 && numericProgress < plannedNumeric) {
+    return '지연';
+  }
+  if (numericProgress <= 0) {
+    if (plannedNumeric > 0) {
+      return '지연';
+    }
+    return '대기중';
+  }
+  if (numericProgress > 0 && numericProgress < 100) {
+    return '작업중';
+  }
+  return null;
+}
+
 function getFieldValue(source, key) {
   if (!source || typeof source !== 'object') {
     return '';
@@ -321,6 +411,45 @@ function normalizeCostEstimate(value, contextLabel) {
   return numeric;
 }
 
+function normalizeDurationValue(value, contextLabel) {
+  const label = contextLabel ? `${contextLabel}: ` : '';
+  if (value === null || value === undefined || value === '') {
+    return '';
+  }
+  const numeric = Number.parseInt(value, 10);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    throw new Error(`${label}Duration 값이 올바르지 않습니다.`);
+  }
+  return numeric;
+}
+
+function normalizePlannedValue(value, contextLabel) {
+  const label = contextLabel ? `${contextLabel}: ` : '';
+  if (value === null || value === undefined || value === '') {
+    return '';
+  }
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0 || numeric > 100) {
+    throw new Error(`${label}Planned 값이 0에서 100 사이의 숫자가 아닙니다.`);
+  }
+  return numeric;
+}
+
+function normalizeWeightValue(value, contextLabel) {
+  const label = contextLabel ? `${contextLabel}: ` : '';
+  if (value === null || value === undefined || value === '') {
+    return '';
+  }
+  const numeric =
+    typeof value === 'number'
+      ? value
+      : Number(value.toString().replace(/%/g, '').trim());
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    throw new Error(`${label}Weight 값이 올바르지 않습니다.`);
+  }
+  return numeric;
+}
+
 function computeLevelFromWbsId(wbsId) {
   const normalized = sanitizeString(wbsId);
   if (!normalized) return 0;
@@ -379,14 +508,17 @@ function normalizeExtendedRecord(source, contextLabel) {
   if (startDate > endDate) {
     throw new Error(`${labelPrefix}Start Date가 End Date보다 늦습니다.`);
   }
-  const duration = sanitizeString(getFieldValue(source, 'duration'));
+  const duration = normalizeDurationValue(getFieldValue(source, 'duration'), contextLabel);
   const progress = normalizeProgress(getFieldValue(source, 'progress'), contextLabel);
-  const planned = sanitizeString(getFieldValue(source, 'planned'));
+  const planned = normalizePlannedValue(getFieldValue(source, 'planned'), contextLabel);
   const owner = sanitizeString(getFieldValue(source, 'owner'));
   const costEstimate = normalizeCostEstimate(getFieldValue(source, 'costEstimate'), contextLabel);
   const priority = sanitizeString(getFieldValue(source, 'priority'));
-  const weight = sanitizeString(getFieldValue(source, 'weight'));
-  const status = sanitizeString(getFieldValue(source, 'status'));
+  const weight = normalizeWeightValue(getFieldValue(source, 'weight'), contextLabel);
+  const statusValue = sanitizeString(getFieldValue(source, 'status'));
+  const normalizedStatus = normalizeStatusValue(statusValue);
+  const derivedStatus = deriveStatusFromProgress(progress, planned);
+  const finalStatus = derivedStatus || normalizedStatus;
   const deliverable = sanitizeString(getFieldValue(source, 'deliverable'));
   const acceptanceCriteria = sanitizeString(getFieldValue(source, 'acceptanceCriteria'));
   const reviewDate = normalizeOptionalDate(
@@ -409,7 +541,7 @@ function normalizeExtendedRecord(source, contextLabel) {
     costEstimate,
     priority,
     weight,
-    status,
+    status: finalStatus,
     deliverable,
     acceptanceCriteria,
     reviewDate
@@ -744,6 +876,57 @@ function summarizeChatSession(session) {
   };
 }
 
+
+async function buildToolResponseMessages(toolCalls, projectDir, cachedRows) {
+  if (!Array.isArray(toolCalls) || !toolCalls.length) {
+    return [];
+  }
+  const responses = [];
+  let rows = cachedRows;
+  
+  for (const call of toolCalls) {
+    if (!call || !call.function) {
+      continue;
+    }
+    
+    let args = {};
+    if (call.function.arguments) {
+      try {
+        args = JSON.parse(call.function.arguments);
+      } catch (error) {
+        args = { parseError: String(error) };
+      }
+    }
+    
+    let content;
+    
+    if (call.function.name === 'load_project_data') {
+      // 프로젝트 데이터 로드
+      if (!rows) {
+        try {
+          rows = await readProjectRows(projectDir);
+        } catch (error) {
+          console.warn('프로젝트 데이터를 불러오는 중 오류', error);
+          rows = [];
+        }
+      }
+      const payload = executeLoadProjectData(args, rows);
+      content = JSON.stringify(payload);
+    } else {
+      content = JSON.stringify({ error: '알 수 없는 함수 호출입니다.' });
+    }
+    
+    responses.push({
+      tool_call_id: call.id,
+      role: 'tool',
+      name: call.function.name,
+      content
+    });
+  }
+  
+  return responses;
+}
+
 async function writeProjectRows(projectDir, rows) {
   return withProjectLock(projectDir, async () => writeProjectRowsUnlocked(projectDir, rows));
 }
@@ -759,6 +942,11 @@ async function writeProjectRowsUnlocked(projectDir, rows) {
   await writeFileAtomic(jsonPath, JSON.stringify(payload, null, 2) + '\n', 'utf8');
   const csvContent = rowsToCsv(rows);
   await writeFileAtomic(csvPath, '\uFEFF' + csvContent, 'utf8');
+  try {
+    await writeTaskIndex(projectDir, rows);
+  } catch (error) {
+    console.warn('Failed to update task index', error);
+  }
 }
 
 async function readProjectRows(projectDir) {
@@ -770,9 +958,15 @@ async function readProjectRowsUnlocked(projectDir) {
   try {
     const rawJson = await fs.promises.readFile(jsonPath, 'utf8');
     const parsed = JSON.parse(rawJson);
-    const rows = normalizeJsonRows(
-      parsed && Array.isArray(parsed.rows) ? parsed.rows : parsed
-    );
+    const rawRows = parsed && Array.isArray(parsed.rows) ? parsed.rows : parsed;
+    const rows = normalizeJsonRows(rawRows);
+    if (Array.isArray(rawRows)) {
+      const rawSnapshot = JSON.stringify(rawRows);
+      const normalizedSnapshot = JSON.stringify(rows);
+      if (rawSnapshot !== normalizedSnapshot) {
+        await writeProjectRowsUnlocked(projectDir, rows);
+      }
+    }
     return rows;
   } catch (error) {
     if (error.code !== 'ENOENT') {
@@ -943,6 +1137,36 @@ async function handleApi(req, res, url) {
       return;
     }
 
+    if (segments[3] === 'task-search') {
+      if (req.method !== 'GET') {
+        sendJson(res, 405, { message: '허용되지 않은 요청입니다.' });
+        return;
+      }
+      try {
+        await fs.promises.access(projectDir);
+      } catch {
+        sendJson(res, 404, { message: '프로젝트를 찾을 수 없습니다.' });
+        return;
+      }
+      const url = new URL(req.url, `http://${req.headers.host}`);
+      const query = sanitizeString(url.searchParams.get('q') || url.searchParams.get('query'));
+      const limitParam = Number.parseInt(url.searchParams.get('limit') || '0', 10);
+      const limit = Math.min(Math.max(Number.isFinite(limitParam) ? limitParam : 5, 1), 15);
+      if (!query) {
+        sendJson(res, 400, { message: '검색 질의를 입력하세요.' });
+        return;
+      }
+      try {
+        const indexItems = await readTaskIndex(projectDir, () => readProjectRows(projectDir));
+        const matches = searchTaskIndex(indexItems, query, { limit });
+        sendJson(res, 200, { query, limit, matches });
+      } catch (error) {
+        console.error('Failed to search task index', error);
+        sendJson(res, 500, { message: error.message || '작업 검색에 실패했습니다.' });
+      }
+      return;
+    }
+
     if (segments[3] === 'report') {
       if (req.method !== 'POST') {
         sendJson(res, 405, { message: '허용되지 않은 요청입니다.' });
@@ -1103,6 +1327,10 @@ async function handleApi(req, res, url) {
               sendJson(res, 400, { message: '메시지 내용을 입력하세요.' });
               return;
             }
+            if (!isConfigured()) {
+              sendJson(res, 503, { message: 'LLM API 키가 설정되지 않았습니다.' });
+              return;
+            }
             const sessions = await readChatSessions(projectDir);
             const sessionIndex = sessions.findIndex(item => item.id === chatId);
             if (sessionIndex === -1) {
@@ -1116,23 +1344,197 @@ async function handleApi(req, res, url) {
               content,
               createdAt: now
             };
+            const session = sessions[sessionIndex];
+            const existingMessages = Array.isArray(session.messages) ? session.messages.slice() : [];
+            const historyMessages = existingMessages
+              .map(message => ({
+                role: message.role === 'assistant' ? 'assistant' : 'user',
+                content: sanitizeString(message.content)
+              }))
+              .filter(item => item.content);
+            const baseMessages = [...historyMessages, { role: 'user', content }];
+
+            let assistantContent = '';
+            let firstResponse;
+            try {
+              firstResponse = await createChatCompletion(baseMessages, {
+                stream: false,
+                tools: CHAT_TOOL_DEFINITIONS,
+                tool_choice: 'auto'
+              });
+            } catch (error) {
+              throw new Error(error.message || 'LLM 호출에 실패했습니다.');
+            }
+            const initialMessages = Array.isArray(firstResponse.messages)
+              ? firstResponse.messages.slice()
+              : baseMessages.slice();
+            const responseMessage = firstResponse.message;
+            const toolCalls = responseMessage && responseMessage.tool_calls;
+            let conversationContext = initialMessages;
+            if (responseMessage && Array.isArray(toolCalls) && toolCalls.length) {
+              conversationContext.push(responseMessage);
+            }
+            let projectRowsCache = null;
+            async function ensureProjectRows() {
+              if (!projectRowsCache) {
+                try {
+                  projectRowsCache = await readProjectRows(projectDir);
+                } catch (error) {
+                  console.warn('프로젝트 WBS를 불러오는 중 오류가 발생했습니다.', error);
+                  projectRowsCache = [];
+                }
+              }
+              return projectRowsCache;
+            }
+            async function appendToolResponses(calls) {
+              if (!Array.isArray(calls) || !calls.length) {
+                return [];
+              }
+              const responses = await buildToolResponseMessages(
+                calls,
+                projectDir,
+                projectRowsCache
+              );
+              conversationContext = conversationContext.concat(responses);
+              return responses;
+            }
+            function extractTaskNamesFromSearchResponses(responses, max = 3) {
+              if (!Array.isArray(responses)) {
+                return [];
+              }
+              const names = [];
+              responses.forEach(response => {
+                if (response && response.name === 'search_project_tasks') {
+                  try {
+                    const payload = JSON.parse(response.content || '{}');
+                    const matches = Array.isArray(payload.matches) ? payload.matches : [];
+                    matches.forEach(match => {
+                      if (names.length >= max) {
+                        return;
+                      }
+                      if (match && match.taskName) {
+                        names.push(match.taskName);
+                      }
+                    });
+                  } catch (error) {
+                    console.warn('검색 응답 파싱 실패', error);
+                  }
+                }
+              });
+              return names;
+            }
+
+            async function requestTaskDetails(taskNames) {
+              const uniqueNames = Array.from(new Set(taskNames.filter(Boolean)));
+              if (!uniqueNames.length) {
+                return;
+              }
+              await ensureProjectRows();
+              const detailCall = {
+                id: createRandomId('tool'),
+                function: {
+                  name: 'get_project_tasks',
+                  arguments: JSON.stringify({ taskNames: uniqueNames })
+                }
+              };
+              conversationContext.push({
+                role: 'assistant',
+                content: null,
+                tool_calls: [detailCall]
+              });
+              await appendToolResponses([detailCall]);
+            }
+
+            async function buildFallbackToolCalls() {
+              const searchArgs = {
+                query: content,
+                limit: 5
+              };
+              const searchCall = {
+                id: createRandomId('tool'),
+                function: {
+                  name: 'search_project_tasks',
+                  arguments: JSON.stringify(searchArgs)
+                }
+              };
+              conversationContext.push({
+                role: 'assistant',
+                content: null,
+                tool_calls: [searchCall]
+              });
+              const searchResponses = await appendToolResponses([searchCall]);
+              const detailNames = extractTaskNamesFromSearchResponses(searchResponses);
+              await requestTaskDetails(detailNames);
+            }
+
+            // LLM의 Tool 사용 판단 결과 처리
+            const firstContent = sanitizeString(firstResponse && firstResponse.content);
+            if (!toolCalls || !toolCalls.length) {
+              // LLM이 Tool을 사용하지 않기로 판단한 경우
+              if (firstContent) {
+                // 직접 답변이 있으면 그대로 사용 (LLM의 판단 신뢰)
+                assistantContent = firstContent;
+                const assistantMessage = {
+                  id: createRandomId('msg'),
+                  role: 'assistant',
+                  content: assistantContent,
+                  createdAt: new Date().toISOString()
+                };
+                session.messages = existingMessages;
+                session.messages.push(userMessage, assistantMessage);
+                session.updatedAt = assistantMessage.createdAt;
+                await writeChatSessions(projectDir, sessions);
+                sendJson(res, 201, { session });
+                return;
+              } else {
+                // 답변도 없고 Tool도 없으면 문제 상황 - 에러 처리
+                throw new Error('LLM이 답변을 생성하지 못했습니다.');
+              }
+            } else {
+              // Tool 호출이 있는 경우 처리
+              const toolResponses = await buildToolResponseMessages(
+                toolCalls,
+                projectDir,
+                projectRowsCache
+              );
+              conversationContext = conversationContext.concat(toolResponses);
+              const hasDetailCall = toolCalls.some(
+                call => call && call.function && call.function.name === 'get_project_tasks'
+              );
+              const hasSearchCall = toolCalls.some(
+                call => call && call.function && call.function.name === 'search_project_tasks'
+              );
+              if (!hasDetailCall && hasSearchCall) {
+                const detailNames = extractTaskNamesFromSearchResponses(toolResponses);
+                await requestTaskDetails(detailNames);
+              }
+            }
+
+            const secondResponse = await createChatCompletion(conversationContext, {
+              stream: false,
+              skipSystemPrompt: true
+            });
+            assistantContent = sanitizeString(secondResponse && secondResponse.content);
+            if (!assistantContent) {
+              if (process.env.DEBUG_LLM === 'true') {
+                console.error('[2nd LLM] Empty response! Context length:', conversationContext.length);
+              }
+              throw new Error('LLM 응답이 비어 있습니다.');
+            }
             const assistantMessage = {
               id: createRandomId('msg'),
               role: 'assistant',
-              content: '준비중입니다.',
-              createdAt: new Date(Date.now() + 1).toISOString()
+              content: assistantContent,
+              createdAt: new Date().toISOString()
             };
-            const session = sessions[sessionIndex];
-            if (!Array.isArray(session.messages)) {
-              session.messages = [];
-            }
+            session.messages = existingMessages;
             session.messages.push(userMessage, assistantMessage);
             session.updatedAt = assistantMessage.createdAt;
             await writeChatSessions(projectDir, sessions);
             sendJson(res, 201, { session });
           } catch (error) {
             console.error('Failed to append chat message', error);
-            sendJson(res, 500, { message: '메시지를 전송하지 못했습니다.' });
+            sendJson(res, 500, { message: error.message || '메시지를 전송하지 못했습니다.' });
           }
           return;
         }

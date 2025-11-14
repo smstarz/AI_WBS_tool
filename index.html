@@ -107,6 +107,38 @@
     .task-add-btn:hover {
       background: #e1e7ff;
     }
+    .task-table-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+      width: 100%;
+    }
+    .level-toggle-group {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      flex-wrap: wrap;
+    }
+    .level-toggle-btn {
+      width: 18px;
+      min-width: 18px;
+      padding: 2px 0;
+      justify-content: center;
+      text-transform: uppercase;
+    }
+    .level-toggle-btn.is-active {
+      background: #4d7cff;
+      border-color: #4d7cff;
+      color: #ffffff;
+    }
+    .level-toggle-btn.is-active:hover,
+    .level-toggle-btn.is-active:focus-visible {
+      background: #3b66d6;
+    }
+    .task-add-btn--primary {
+      margin-left: auto;
+    }
     .sr-only {
       position: absolute;
       width: 1px;
@@ -843,40 +875,6 @@
             작업을 선택하면 여기에서 상세 정보를 볼 수 있습니다.
           </p>
         </div>
-        <section class="chatbot-widget" aria-label="AI WBS 챗봇">
-          <div class="chatbot-widget__header">
-            <span id="chatbotHeaderTitle" class="chatbot-widget__title">AI WBS 챗봇</span>
-            <div class="chatbot-widget__header-actions">
-              <button id="chatbotHeaderBack" type="button" class="chatbot-header-back" disabled>← 목록</button>
-              <span id="chatbotStatus" class="chatbot-widget__status">LLM 연결 준비중</span>
-            </div>
-          </div>
-          <div class="chatbot-widget__content">
-            <div id="chatbotListView" class="chatbot-view is-active" aria-live="polite">
-              <form id="chatbotTopicForm" class="chatbot-topic-form" autocomplete="off">
-                <label for="chatbotTopicInput" class="sr-only">새 대화 주제</label>
-                <input
-                  id="chatbotTopicInput"
-                  class="chatbot-widget__input chatbot-topic-form__input"
-                  type="text"
-                  placeholder="새 대화 주제를 입력하세요"
-                />
-                <button type="submit" class="chatbot-widget__submit">시작</button>
-              </form>
-              <div id="chatbotTopics" class="chatbot-topics"></div>
-              <p id="chatbotListMessage" class="chatbot-widget__helper"></p>
-            </div>
-            <div id="chatbotConversationView" class="chatbot-view" aria-live="polite">
-              <div id="chatbotMessages" class="chatbot-widget__messages"></div>
-              <p id="chatbotConversationMessage" class="chatbot-widget__helper"></p>
-              <form id="chatbotForm" class="chatbot-widget__form" autocomplete="off">
-                <label for="chatbotInput" class="sr-only">메시지 입력</label>
-                <input id="chatbotInput" class="chatbot-widget__input" type="text" placeholder="메시지를 입력하세요…" />
-                <button id="chatbotSubmit" type="submit" class="chatbot-widget__submit" disabled>전송</button>
-              </form>
-            </div>
-          </div>
-        </section>
       </aside>
     </div>
     <p id="statusMessage" class="status"></p>
@@ -992,8 +990,56 @@
       </form>
     </div>
   </div>
+  <!-- 채팅 위젯 (body 직계 자식으로 이동하여 z-index 문제 해결) -->
+  <section id="chatbotWidget" class="chatbot-widget" aria-label="AI WBS 챗봇" aria-hidden="true">
+    <div class="chatbot-widget__header">
+      <span id="chatbotHeaderTitle" class="chatbot-widget__title">AI WBS 챗봇</span>
+      <div class="chatbot-widget__header-actions">
+        <button id="chatbotHeaderBack" type="button" class="chatbot-header-back" disabled>← 목록</button>
+        <span id="chatbotStatus" class="chatbot-widget__status">LLM 연결 준비중</span>
+      </div>
+    </div>
+    <div class="chatbot-widget__content">
+      <div id="chatbotListView" class="chatbot-view is-active" aria-live="polite">
+        <form id="chatbotTopicForm" class="chatbot-topic-form" autocomplete="off">
+          <label for="chatbotTopicInput" class="sr-only">새 대화 주제</label>
+          <input
+            id="chatbotTopicInput"
+            class="chatbot-widget__input chatbot-topic-form__input"
+            type="text"
+            placeholder="새 대화 주제를 입력하세요"
+          />
+          <button type="submit" class="chatbot-widget__submit">시작</button>
+        </form>
+        <div id="chatbotTopics" class="chatbot-topics"></div>
+        <p id="chatbotListMessage" class="chatbot-widget__helper"></p>
+      </div>
+      <div id="chatbotConversationView" class="chatbot-view" aria-live="polite">
+        <div id="chatbotMessages" class="chatbot-widget__messages"></div>
+        <p id="chatbotConversationMessage" class="chatbot-widget__helper"></p>
+        <form id="chatbotForm" class="chatbot-widget__form" autocomplete="off">
+          <label for="chatbotInput" class="sr-only">메시지 입력</label>
+          <input id="chatbotInput" class="chatbot-widget__input" type="text" placeholder="메시지를 입력하세요…" />
+          <button id="chatbotSubmit" type="submit" class="chatbot-widget__submit" disabled>전송</button>
+        </form>
+      </div>
+    </div>
+  </section>
+  <button
+    id="chatbotFab"
+    class="chatbot-fab"
+    type="button"
+    aria-label="AI WBS 챗봇 열기"
+    aria-controls="chatbotWidget"
+    aria-expanded="false"
+  >
+    <span aria-hidden="true">AI</span>
+    <span class="sr-only">AI WBS 챗봇 열기</span>
+  </button>
   <script src="js/jsgantt.bundle.js"></script>
   <script src="js/papaparse.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
   <script type="module">
     import {
       FIELD_DEFS,
@@ -1151,6 +1197,84 @@
           return parentRecord.taskName;
         }
         return parentKey;
+      }
+
+      function reapplyLevelExpansionLimit() {
+        applyLevelExpansionLimit({ skipRefresh: true });
+      }
+
+      function setLevelExpansionLimit(level) {
+        if (!LEVEL_TOGGLE_RANGE.includes(level)) {
+          return;
+        }
+        currentLevelExpansionLimit = level;
+        updateLevelToggleButtons();
+        applyLevelExpansionLimit();
+      }
+
+      function applyLevelExpansionLimit(options = {}) {
+        if (!ganttChart || !Array.isArray(ganttChart.vTaskList)) {
+          return;
+        }
+        const skipRefresh = Boolean(options.skipRefresh);
+        const limit =
+          currentLevelExpansionLimit || Math.max(...LEVEL_TOGGLE_RANGE);
+        let didChange = false;
+        ganttChart.vTaskList.forEach(task => {
+          if (
+            typeof task.getLevel !== 'function' ||
+            typeof task.getGroup !== 'function' ||
+            typeof task.getOpen !== 'function' ||
+            typeof task.getID !== 'function'
+          ) {
+            return;
+          }
+          if (task.getGroup() !== 1) {
+            return;
+          }
+          const taskLevel = task.getLevel();
+          const shouldOpen = taskLevel < limit;
+          const isOpen = task.getOpen() === 1;
+          if (shouldOpen && !isOpen) {
+            JSGantt.folder(task.getID(), ganttChart);
+            didChange = true;
+          } else if (!shouldOpen && isOpen) {
+            JSGantt.folder(task.getID(), ganttChart);
+            didChange = true;
+          }
+        });
+        if (didChange && !skipRefresh) {
+          refreshTaskTableLayout();
+        } else if (!didChange) {
+          updateLevelToggleButtons();
+        }
+      }
+
+      function refreshTaskTableLayout() {
+        if (!ganttChart) {
+          return;
+        }
+        setTimeout(() => {
+          normalizeTaskTable(ganttChart);
+          makeTableEditable(ganttChart);
+          updateRowSelection();
+          updateLevelToggleButtons();
+        }, 0);
+      }
+
+      function updateLevelToggleButtons() {
+        document.querySelectorAll('.level-toggle-btn').forEach(button => {
+          const level = Number.parseInt(button.dataset.level, 10);
+          if (!Number.isFinite(level)) {
+            return;
+          }
+          const isActive = currentLevelExpansionLimit === level;
+          const label = '레벨 ' + level + '까지 펼치기';
+          button.classList.toggle('is-active', isActive);
+          button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+          button.setAttribute('aria-label', label + (isActive ? ' (선택됨)' : ''));
+          button.title = label + (isActive ? ' (선택됨)' : '');
+        });
       }
 
       const COST_NUMBER_FORMATTER =
@@ -1762,8 +1886,12 @@
       let isLoadingProject = false;
       let isSavingProject = false;
       let isGeneratingReport = false;
+      let automaticFullSaveInFlight = false;
+      let pendingAutomaticFullSave = false;
       let selectedTaskWbsId = null;
       let activeEditor = null;
+      const LEVEL_TOGGLE_RANGE = [1, 2, 3, 4];
+      let currentLevelExpansionLimit = 4;
       function createConfiguredGanttChart() {
         const chart = new JSGantt.GanttChart(target, 'day');
         if (!chart.getDivId()) {
@@ -2511,11 +2639,12 @@
           return;
         }
         let requiresRefresh = false;
+        let shouldTriggerFullSave = false;
         updates.forEach(update => {
           if (!update || !update.wbsId || !update.field) {
             return;
           }
-          const { wbsId, field, value, previousValue } = update;
+          const { wbsId, field, value, previousValue, requiresFullSave } = update;
           const record = currentRowLookup.get(wbsId) || null;
           if (record) {
             record[field] = value;
@@ -2533,7 +2662,13 @@
             previousValue,
             record
           });
+          if (requiresFullSave) {
+            shouldTriggerFullSave = true;
+          }
         });
+        if (shouldTriggerFullSave) {
+          scheduleAutomaticFullSave();
+        }
         if (!requiresRefresh) {
           return;
         }
@@ -2681,6 +2816,7 @@
         if (typeof ganttChart.DrawDependencies === 'function') {
           ganttChart.DrawDependencies();
         }
+        reapplyLevelExpansionLimit();
         normalizeTaskTable(ganttChart);
         makeTableEditable(ganttChart);
         formatGanttDateHeaders(ganttChart);
@@ -2725,7 +2861,7 @@
             hasIssues: false
           };
         }
-        const issues = evaluateRecord(record, { rows: currentRows });
+        const { issues, autoUpdates } = evaluateRecord(record, { rows: currentRows });
         if (issues.length) {
           currentValidationState.issuesByWbsId.set(record.wbsId, issues);
         } else {
@@ -2734,6 +2870,9 @@
         currentValidationState.hasIssues = currentValidationState.issuesByWbsId.size > 0;
         record.validationIssues = issues;
         applyValidationState(currentValidationState);
+        if (autoUpdates && autoUpdates.length) {
+          handleAutomaticFieldUpdates(autoUpdates);
+        }
       }
 
       function applyValidationState(state) {
@@ -3332,6 +3471,29 @@
         });
       }
 
+      function scheduleAutomaticFullSave() {
+        if (!currentProject || !currentRows.length || manualUnsavedChanges) {
+          return;
+        }
+        if (automaticFullSaveInFlight) {
+          pendingAutomaticFullSave = true;
+          return;
+        }
+        automaticFullSaveInFlight = true;
+        persistProjectRows({ silent: true })
+          .catch(error => {
+            console.error('[WBS] 자동 계산 필드 저장 실패', error);
+            setStatus(error.message || '자동 저장에 실패했습니다.', 'error');
+          })
+          .finally(() => {
+            automaticFullSaveInFlight = false;
+            if (pendingAutomaticFullSave) {
+              pendingAutomaticFullSave = false;
+              scheduleAutomaticFullSave();
+            }
+          });
+      }
+
       function focusRowByWbsId(wbsId) {
         if (!wbsId) return;
         const selector = '.gtasktable tr.task-row[data-wbs-id="' + cssEscape(wbsId) + '"]';
@@ -3515,23 +3677,45 @@
         const spanningHeaderRow = document.querySelector('.gtasktableh tbody tr:first-child');
         if (spanningHeaderRow) {
           const spanningCell = spanningHeaderRow.querySelector('.gspanning');
-          if (spanningCell) {
-            const desiredColSpan = Math.max(1, TASK_TABLE_COLUMNS.length - 1);
-            if (spanningCell.colSpan !== desiredColSpan) {
-              spanningCell.colSpan = desiredColSpan;
+            if (spanningCell) {
+              const desiredColSpan = Math.max(1, TASK_TABLE_COLUMNS.length - 1);
+              if (spanningCell.colSpan !== desiredColSpan) {
+                spanningCell.colSpan = desiredColSpan;
+              }
+              spanningCell.innerHTML = '';
+              const controlBar = document.createElement('div');
+              controlBar.className = 'task-table-controls';
+              const levelGroup = document.createElement('div');
+              levelGroup.className = 'level-toggle-group';
+              LEVEL_TOGGLE_RANGE.forEach(level => {
+                const levelBtn = document.createElement('button');
+                levelBtn.type = 'button';
+                levelBtn.className = 'task-add-btn level-toggle-btn';
+                levelBtn.dataset.level = level.toString();
+                levelBtn.textContent = level.toString();
+                levelBtn.setAttribute('aria-pressed', 'false');
+                levelBtn.setAttribute('aria-label', '레벨 ' + level + '까지 펼치기');
+                levelBtn.addEventListener('click', event => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  setLevelExpansionLimit(level);
+                });
+                levelGroup.appendChild(levelBtn);
+              });
+              controlBar.appendChild(levelGroup);
+              const addBtn = document.createElement('button');
+              addBtn.type = 'button';
+              addBtn.className = 'task-add-btn task-add-btn--primary';
+              addBtn.textContent = 'add Task';
+              addBtn.addEventListener('click', event => {
+                event.preventDefault();
+                openAddTaskModal();
+              });
+              controlBar.appendChild(addBtn);
+              spanningCell.appendChild(controlBar);
+              updateLevelToggleButtons();
             }
-            spanningCell.innerHTML = '';
-            const addBtn = document.createElement('button');
-            addBtn.type = 'button';
-            addBtn.className = 'task-add-btn';
-            addBtn.textContent = 'add Task';
-            addBtn.addEventListener('click', event => {
-              event.preventDefault();
-              openAddTaskModal();
-            });
-            spanningCell.appendChild(addBtn);
           }
-        }
 
         chart.vTaskList.forEach(task => {
           if (typeof task.getListChildRow !== 'function') return;
@@ -3585,6 +3769,7 @@
           reorderRow(footerRow, true);
         }
         updateRowSelection();
+        updateLevelToggleButtons();
       }
 
       function resolveInlineErrorHost(target) {

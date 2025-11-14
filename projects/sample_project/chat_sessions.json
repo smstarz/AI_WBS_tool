@@ -1,37 +1,23 @@
 {
-  "updatedAt": "2025-11-11T00:48:13.332Z",
+  "updatedAt": "2025-11-14T08:09:52.472Z",
   "sessions": [
     {
-      "id": "chat_mhturcic0bzng5",
+      "id": "chat_mhykup26d2y9x5",
       "title": "새 대화",
-      "createdAt": "2025-11-11T00:48:13.331Z",
-      "updatedAt": "2025-11-11T00:48:13.331Z",
-      "messages": []
-    },
-    {
-      "id": "chat_mhta6xit43aidp",
-      "title": "새 주제",
-      "createdAt": "2025-11-10T15:12:28.468Z",
-      "updatedAt": "2025-11-10T15:12:28.468Z",
-      "messages": []
-    },
-    {
-      "id": "chat_mht9udjrgg7k1q",
-      "title": "대화 시작",
-      "createdAt": "2025-11-10T15:02:42.711Z",
-      "updatedAt": "2025-11-10T15:03:02.278Z",
+      "createdAt": "2025-11-14T08:09:44.285Z",
+      "updatedAt": "2025-11-14T08:09:52.471Z",
       "messages": [
         {
-          "id": "msg_mht9usn9w27nvd",
+          "id": "msg_mhykutcrx8yuq3",
           "role": "user",
-          "content": "너는 누구니?",
-          "createdAt": "2025-11-10T15:03:02.277Z"
+          "content": "안녕? 넌 누구야?",
+          "createdAt": "2025-11-14T08:09:49.851Z"
         },
         {
-          "id": "msg_mht9usn9dxrp1h",
+          "id": "msg_mhykuvdj5nsdeh",
           "role": "assistant",
-          "content": "준비중입니다.",
-          "createdAt": "2025-11-10T15:03:02.278Z"
+          "content": "안녕하세요! 저는 WBS 프로젝트 관리 AI 어시스턴트로, 프로젝트 데이터 조회·분석을 도와드립니다. 필요한 질문이나 데이터가 있으면 바로 말씀해 주세요.",
+          "createdAt": "2025-11-14T08:09:52.471Z"
         }
       ]
     }

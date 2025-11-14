@@ -15,6 +15,8 @@ export function initChatbot({ fetcher = window.fetch } = {}) {
   const chatForm = document.getElementById('chatbotForm');
   const chatInput = document.getElementById('chatbotInput');
   const chatSubmit = document.getElementById('chatbotSubmit');
+  const fabButton = document.getElementById('chatbotFab');
+  const widgetVisibleClass = 'is-floating-open';
   const defaultHeaderTitle = headerTitle ? headerTitle.textContent : 'AI WBS 챗봇';
 
   if (!widget) {
@@ -29,6 +31,7 @@ export function initChatbot({ fetcher = window.fetch } = {}) {
   let isChatListLoading = false;
   let isTopicFormLocked = false;
   let isMessageFormLocked = false;
+  let isWidgetOpen = false;
 
   function truncate(text, maxLength = 80) {
     if (!text) return '';
@@ -57,7 +60,7 @@ export function initChatbot({ fetcher = window.fetch } = {}) {
 
   function setStatusText(text) {
     if (statusLabel) {
-      statusLabel.textContent = text || 'LLM 연결 준비중';
+      statusLabel.textContent = text || 'Model: gpt-5-nano';
     }
   }
 
@@ -77,6 +80,62 @@ export function initChatbot({ fetcher = window.fetch } = {}) {
     if (headerTitle) {
       headerTitle.textContent = text || defaultHeaderTitle;
     }
+  }
+
+  function focusChatField() {
+    if (!isWidgetOpen) {
+      return;
+    }
+    if (activeChatSession && chatInput) {
+      chatInput.focus();
+      return;
+    }
+    if (topicInput) {
+      topicInput.focus();
+    }
+  }
+
+  function setWidgetVisibility(open) {
+    const shouldOpen = Boolean(open);
+    isWidgetOpen = shouldOpen;
+    widget.classList.toggle(widgetVisibleClass, shouldOpen);
+    widget.setAttribute('aria-hidden', shouldOpen ? 'false' : 'true');
+    if (fabButton) {
+      fabButton.classList.toggle('is-active', shouldOpen);
+      fabButton.setAttribute('aria-expanded', shouldOpen ? 'true' : 'false');
+    }
+    if (shouldOpen) {
+      const focusFrame = window.requestAnimationFrame || (cb => window.setTimeout(cb, 0));
+      focusFrame(() => focusChatField());
+    }
+  }
+
+  function toggleWidgetVisibility() {
+    setWidgetVisibility(!isWidgetOpen);
+  }
+
+  setWidgetVisibility(false);
+
+  function escapeHtml(value) {
+    return value
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  function renderRichText(content) {
+    const text = typeof content === 'string' ? content : '';
+    const hasMarkdownSupport =
+      typeof window !== 'undefined' &&
+      typeof window.marked !== 'undefined' &&
+      typeof window.DOMPurify !== 'undefined';
+    if (hasMarkdownSupport) {
+      const html = window.marked.parse(text);
+      return window.DOMPurify.sanitize(html);
+    }
+    return escapeHtml(text).replace(/\r?\n/g, '<br>');
   }
 
   function switchView(mode) {
@@ -222,7 +281,7 @@ export function initChatbot({ fetcher = window.fetch } = {}) {
       const bubble = document.createElement('div');
       const roleClass = message.role === 'user' ? 'user' : 'bot';
       bubble.className = 'chatbot-widget__message chatbot-widget__message--' + roleClass;
-      bubble.textContent = message.content || '';
+      bubble.innerHTML = renderRichText(message.content || '');
       messagesContainer.appendChild(bubble);
     });
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
@@ -233,7 +292,7 @@ export function initChatbot({ fetcher = window.fetch } = {}) {
     renderTopics();
     setHeaderTitle(session ? session.title || defaultHeaderTitle : null);
     if (session) {
-      setConversationHelper('답변은 "준비중입니다."로 표시됩니다.');
+      setConversationHelper('');
       switchView('chat');
       renderMessages(session);
       syncMessageFormState();
@@ -299,7 +358,7 @@ export function initChatbot({ fetcher = window.fetch } = {}) {
     renderTopics();
     syncTopicFormState();
     let nextSessions = [];
-    let nextStatus = 'LLM 연결 준비중';
+    let nextStatus = 'Model: gpt-5-nano';
     let nextHelper = '';
     try {
       const apiBase = getChatApiBase();
@@ -314,7 +373,7 @@ export function initChatbot({ fetcher = window.fetch } = {}) {
       const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
       nextSessions = sessions;
       nextHelper = sessions.length ? '' : '대화 기록이 없습니다. 새 토픽을 만들어 보세요.';
-      nextStatus = 'LLM 연결 준비중';
+      nextStatus = 'Model: gpt-5-nano';
     } catch (error) {
       console.error(error);
       nextSessions = [];
@@ -359,7 +418,7 @@ export function initChatbot({ fetcher = window.fetch } = {}) {
         renderTopics();
       }
       setConversation(session);
-      setStatusText('LLM 연결 준비중');
+      setStatusText('Model: gpt-5-nano');
     } catch (error) {
       console.error(error);
       setConversationHelper(error.message || '대화를 불러오지 못했습니다.');
@@ -536,8 +595,8 @@ export function initChatbot({ fetcher = window.fetch } = {}) {
           upsertSummary(summary);
           renderTopics();
         }
-        setConversationHelper('답변은 "준비중입니다."로 표시됩니다.');
-        setStatusText('LLM 연결 준비중');
+        setConversationHelper('');
+        setStatusText('Model: gpt-5-nano');
       }
     } catch (error) {
       console.error(error);
@@ -557,7 +616,7 @@ export function initChatbot({ fetcher = window.fetch } = {}) {
     isTopicFormLocked = false;
     isMessageFormLocked = false;
     setConversation(null);
-    setStatusText('LLM 연결 준비중');
+    setStatusText('Model: gpt-5-nano');
     setListHelper(
       currentProject
         ? '대화 기록이 없습니다. 새 토픽을 만들어 보세요.'
@@ -586,6 +645,21 @@ export function initChatbot({ fetcher = window.fetch } = {}) {
   if (chatInput) {
     chatInput.addEventListener('input', () => syncMessageFormState());
   }
+  if (fabButton) {
+    fabButton.addEventListener('click', () => toggleWidgetVisibility());
+  }
+  document.addEventListener('keydown', event => {
+    if (event.key === 'Escape' && isWidgetOpen) {
+      setWidgetVisibility(false);
+      if (fabButton) {
+        try {
+          fabButton.focus({ preventScroll: true });
+        } catch {
+          fabButton.focus();
+        }
+      }
+    }
+  });
 
   resetInterface();
 

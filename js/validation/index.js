@@ -457,11 +457,7 @@ function createTaskRecordFromNormalized(normalizedRow, contextLabel) {
   );
   const priority = normalizePriorityValue(resolveFieldValue(normalizedRow, FIELD_DEFS_BY_KEY.priority));
   const weight = coerceString(resolveFieldValue(normalizedRow, FIELD_DEFS_BY_KEY.weight)).trim();
-  let status = normalizeStatusValue(resolveFieldValue(normalizedRow, FIELD_DEFS_BY_KEY.status));
-  const derivedStatus = deriveStatusFromProgress(progress, planned);
-  if (derivedStatus) {
-    status = derivedStatus;
-  }
+  const status = normalizeStatusValue(resolveFieldValue(normalizedRow, FIELD_DEFS_BY_KEY.status));
   const deliverable = coerceString(resolveFieldValue(normalizedRow, FIELD_DEFS_BY_KEY.deliverable)).trim();
   const acceptanceCriteria = coerceString(
     resolveFieldValue(normalizedRow, FIELD_DEFS_BY_KEY.acceptanceCriteria)
@@ -592,10 +588,23 @@ function parseCsvText(csvText, options = {}) {
   return rows;
 }
 
-function evaluateRecord(record, { rows = [] } = {}) {
+function evaluateRecord(record, { rows = [], autoUpdates } = {}) {
   const issues = [];
+  const localAutoUpdates = [];
+  const pushAutoUpdate = update => {
+    if (!update) {
+      return;
+    }
+    localAutoUpdates.push(update);
+    if (Array.isArray(autoUpdates)) {
+      autoUpdates.push(update);
+    }
+  };
   if (!record || typeof record !== 'object') {
-    return [{ field: '*', message: '작업 데이터가 존재하지 않습니다.', severity: 'error' }];
+    return {
+      issues: [{ field: '*', message: '작업 데이터가 존재하지 않습니다.', severity: 'error' }],
+      autoUpdates: localAutoUpdates
+    };
   }
   if (!record.wbsId || !record.wbsId.toString().trim()) {
     issues.push({ field: 'wbsId', message: 'WBS ID가 비어 있습니다.', severity: 'error' });
@@ -616,7 +625,15 @@ function evaluateRecord(record, { rows = [] } = {}) {
   }
   const derivedStatus = deriveStatusFromProgress(record.progress, record.planned);
   if (derivedStatus && derivedStatus !== record.status) {
+    const previousStatus = record.status;
     record.status = derivedStatus;
+    pushAutoUpdate({
+      wbsId: record.wbsId,
+      field: 'status',
+      value: derivedStatus,
+      previousValue: previousStatus,
+      requiresFullSave: true
+    });
     issues.push({
       field: 'status',
       message: 'Progress 값에 따라 Status가 "' + derivedStatus + '"로 자동 변경되었습니다.',
@@ -625,7 +642,15 @@ function evaluateRecord(record, { rows = [] } = {}) {
   } else {
     const normalizedStatus = normalizeStatusValue(record.status);
     if (normalizedStatus !== record.status) {
+      const previousStatus = record.status;
       record.status = normalizedStatus;
+      pushAutoUpdate({
+        wbsId: record.wbsId,
+        field: 'status',
+        value: normalizedStatus,
+        previousValue: previousStatus,
+        requiresFullSave: true
+      });
       issues.push({
         field: 'status',
         message: 'Status 값이 자동으로 보정되었습니다.',
@@ -641,7 +666,7 @@ function evaluateRecord(record, { rows = [] } = {}) {
       severity: 'warning'
     });
   }
-  return issues;
+  return { issues, autoUpdates: localAutoUpdates };
 }
 
 function evaluateWeightHierarchy(rows, childrenByParent = groupChildrenByParent(rows)) {
@@ -700,14 +725,21 @@ function addWeightIssue(map, wbsId, message) {
 
 function evaluateRecords(rows) {
   const issuesByWbsId = new Map();
+  const autoUpdates = [];
   (rows || []).forEach(row => {
-    const issues = evaluateRecord(row, { rows });
+    const { issues } = evaluateRecord(row, { rows, autoUpdates });
     if (issues.length) {
       issuesByWbsId.set(row.wbsId, issues);
     }
   });
-  const { issuesByWbsId: hierarchyIssues, childrenByParent, autoUpdates } =
-    evaluateHierarchyFieldConsistency(rows);
+  const {
+    issuesByWbsId: hierarchyIssues,
+    childrenByParent,
+    autoUpdates: hierarchyAutoUpdates
+  } = evaluateHierarchyFieldConsistency(rows);
+  if (Array.isArray(hierarchyAutoUpdates) && hierarchyAutoUpdates.length) {
+    hierarchyAutoUpdates.forEach(update => autoUpdates.push(update));
+  }
   hierarchyIssues.forEach((issues, wbsId) => {
     if (!issues || !issues.length) {
       return;
